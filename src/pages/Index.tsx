@@ -4,43 +4,31 @@ import { Hero } from '@/components/Hero';
 import { DestinationGallery } from '@/components/DestinationGallery';
 import { TripPlanner } from '@/components/TripPlanner';
 import { TripModal } from '@/components/TripModal';
+import { TripDetails } from '@/components/TripDetails';
 import { Footer } from '@/components/Footer';
 import { useToast } from '@/hooks/use-toast';
-import { invokeLLM } from '@/integrations/core';
 
 const Index = () => {
   const [isTripPlannerOpen, setIsTripPlannerOpen] = useState(false);
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
+  const [isTripDetailsOpen, setIsTripDetailsOpen] = useState(false);
+  const [currentTrip, setCurrentTrip] = useState(null);
   const { toast } = useToast();
 
   const handlePlanTrip = () => {
     setIsTripModalOpen(true);
   };
 
+  const handleTripCreated = (tripData: any) => {
+    setCurrentTrip(tripData);
+    setIsTripDetailsOpen(true);
+    setIsTripModalOpen(false);
+  };
+
   const handleActionClick = async (action: string) => {
     setIsTripPlannerOpen(true);
     
-    // Generate AI response based on action
     try {
-      let prompt = '';
-      switch (action) {
-        case 'incredible-views':
-          prompt = 'Tell me about the most incredible scenic views and landscapes in India. Include specific locations, best viewing spots, and photography tips.';
-          break;
-        case 'bucket-list-food':
-          prompt = 'What are the must-try bucket-list foods and culinary experiences across different regions of India? Include specific dishes, restaurants, and food tours.';
-          break;
-        case 'family-road-trip':
-          prompt = 'Help me plan an amazing family road trip in India. Suggest routes, family-friendly destinations, and practical tips for traveling with kids.';
-          break;
-        case 'cultural-destinations':
-          prompt = 'What are the top cultural destinations in India? Include heritage sites, museums, festivals, and cultural experiences that showcase India\'s rich history.';
-          break;
-        default:
-          prompt = 'Tell me about amazing travel experiences in India.';
-      }
-
-      // The AI response will be handled by the TripPlanner component
       toast({
         title: "SAFAR AI Activated",
         description: "Your AI travel assistant is ready to help plan your Indian adventure!"
@@ -68,7 +56,14 @@ const Index = () => {
       
       <TripModal 
         isOpen={isTripModalOpen} 
-        onClose={() => setIsTripModalOpen(false)} 
+        onClose={() => setIsTripModalOpen(false)}
+        onTripCreated={handleTripCreated}
+      />
+
+      <TripDetails
+        isOpen={isTripDetailsOpen}
+        onClose={() => setIsTripDetailsOpen(false)}
+        tripData={currentTrip}
       />
     </div>
   );
