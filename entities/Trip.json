@@ -1,0 +1,45 @@
+{
+  "name": "Trip",
+  "description": "A travel trip planned by users",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the trip"
+    },
+    "destination": {
+      "type": "string",
+      "description": "Primary destination of the trip"
+    },
+    "duration": {
+      "type": "string",
+      "description": "Duration of the trip (e.g., '5 days', '2 weeks')"
+    },
+    "travelers": {
+      "type": "number",
+      "description": "Number of travelers"
+    },
+    "budget": {
+      "type": "string",
+      "description": "Budget range for the trip"
+    },
+    "is_road_trip": {
+      "type": "boolean",
+      "description": "Whether this is a road trip"
+    },
+    "additional_locations": {
+      "type": "array",
+      "description": "Additional locations to visit",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ai_suggestions": {
+      "type": "string",
+      "description": "AI-generated suggestions for the trip"
+    },
+    "status": {
+      "type": "string",
+      "description": "Status of the trip (planning, confirmed, completed)"
+    }
+  }
+}

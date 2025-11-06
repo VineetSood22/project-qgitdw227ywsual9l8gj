@@ -10,19 +10,19 @@
     --card-foreground: 0 0% 0%;
     --popover: 223.8136 0.0005% 98.6829%;
     --popover-foreground: 0 0% 0%;
-    --primary: 0 0% 0%;
+    --primary: 22 78% 55%;
     --primary-foreground: 223.8136 -172.5242% 100.0000%;
     --secondary: 223.8136 0.0001% 92.1478%;
     --secondary-foreground: 0 0% 0%;
     --muted: 223.8136 0.0002% 96.0587%;
     --muted-foreground: 223.8136 0.0000% 32.3067%;
-    --accent: 223.8136 0.0001% 92.1478%;
+    --accent: 39 100% 77%;
     --accent-foreground: 0 0% 0%;
     --destructive: 358.4334 74.9120% 59.7455%;
     --destructive-foreground: 223.8136 -172.5242% 100.0000%;
     --border: 223.8136 0.0001% 89.5577%;
     --input: 223.8136 0.0001% 92.1478%;
-    --ring: 0 0% 0%;
+    --ring: 22 78% 55%;
     --chart-1: 40.6655 100.2361% 50.9228%;
     --chart-2: 223.7490 85.9924% 55.8092%;
     --chart-3: 223.8136 0.0000% 64.4710%;
@@ -40,24 +40,7 @@
     --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
     --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
     --radius: 0.5rem;
-    --shadow-x: 0px;
-    --shadow-y: 1px;
-    --shadow-blur: 2px;
-    --shadow-spread: 0px;
-    --shadow-opacity: 0.18;
-    --shadow-color: hsl(0 0% 0%);
-    --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
-    --shadow-xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
-    --shadow-sm: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
-    --shadow: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
-    --shadow-md: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 2px 4px -1px hsl(0 0% 0% / 0.18);
-    --shadow-lg: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 4px 6px -1px hsl(0 0% 0% / 0.18);
-    --shadow-xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 8px 10px -1px hsl(0 0% 0% / 0.18);
-    --shadow-2xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.45);
-    --tracking-normal: 0em;
-    --spacing: 0.25rem;
   }
-
 }
 
 @layer base {
@@ -67,5 +50,50 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .hero-gradient {
+    background: linear-gradient(135deg, #ff9a56 0%, #ff6b35 50%, #f7931e 100%);
+  }
+  
+  .indian-gradient {
+    background: linear-gradient(135deg, #ff9933 0%, #138808 33%, #ffffff 66%, #000080 100%);
+  }
+  
+  .saffron-gradient {
+    background: linear-gradient(135deg, #ff9933 0%, #ff6b35 100%);
+  }
+  
+  .green-gradient {
+    background: linear-gradient(135deg, #138808 0%, #228b22 100%);
+  }
+  
+  .glass-morphism {
+    @apply backdrop-blur-xl bg-white/10 border border-white/20 shadow-lg;
+  }
+  
+  .text-shadow {
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+  }
+  
+  .hover-scale {
+    @apply transition-transform duration-300 hover:scale-105;
+  }
+  
+  .fade-in {
+    animation: fadeIn 0.6s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }

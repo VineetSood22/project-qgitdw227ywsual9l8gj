@@ -1,0 +1,48 @@
+{
+  "name": "Destination",
+  "description": "Travel destinations in India",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the destination"
+    },
+    "state": {
+      "type": "string",
+      "description": "State where the destination is located"
+    },
+    "region": {
+      "type": "string",
+      "description": "Region (North, South, East, West, Central, Northeast)"
+    },
+    "type": {
+      "type": "string",
+      "description": "Type of destination (hill station, beach, heritage, spiritual, adventure, etc.)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the destination"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "URL of the destination image"
+    },
+    "best_time_to_visit": {
+      "type": "string",
+      "description": "Best time to visit this destination"
+    },
+    "popular_attractions": {
+      "type": "array",
+      "description": "Popular attractions at this destination",
+      "items": {
+        "type": "string"
+      }
+    },
+    "activities": {
+      "type": "array",
+      "description": "Activities available at this destination",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
