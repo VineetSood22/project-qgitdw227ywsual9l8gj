@@ -9,10 +9,7 @@ import { EnhancedTripDetails } from '@/components/EnhancedTripDetails';
 import { MyTrips } from '@/components/MyTrips';
 import { EnhancedTripPlanner } from '@/components/EnhancedTripPlanner';
 import { Footer } from '@/components/Footer';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { User } from '@/entities';
-import { LogIn, LogOut, Loader2 } from 'lucide-react';
 
 const Index = () => {
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
@@ -22,89 +19,13 @@ const Index = () => {
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(null);
   const [generatingTrip, setGeneratingTrip] = useState(null);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    checkUser();
-  }, []);
-
-  const checkUser = async () => {
-    setIsCheckingAuth(true);
-    try {
-      const user = await User.me();
-      console.log('Current user:', user);
-      setCurrentUser(user);
-    } catch (error) {
-      console.log('User not logged in:', error);
-      setCurrentUser(null);
-    } finally {
-      setIsCheckingAuth(false);
-    }
-  };
-
-  const handleLogin = async () => {
-    try {
-      console.log('Initiating login...');
-      await User.login();
-      // After login redirect, user will be checked again
-    } catch (error) {
-      console.error('Login error:', error);
-      toast({
-        title: "Login Error",
-        description: "Failed to login. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
-    try {
-      await User.logout();
-      setCurrentUser(null);
-      toast({
-        title: "Logged Out",
-        description: "You have been successfully logged out."
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast({
-        title: "Logout Error",
-        description: "Failed to logout. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
-
   const handlePlanTrip = () => {
-    if (!currentUser) {
-      toast({
-        title: "Login Required",
-        description: "Please login to plan a trip.",
-        variant: "destructive"
-      });
-      handleLogin();
-      return;
-    }
     setIsTripModalOpen(true);
   };
 
   const handleSelectPackage = (pkg: any) => {
-    if (!currentUser) {
-      toast({
-        title: "Login Required",
-        description: "Please login to select a package.",
-        variant: "destructive"
-      });
-      handleLogin();
-      return;
-    }
-    
     toast({
       title: "Package Selected",
       description: `Creating trip based on ${pkg.name}`,
@@ -154,56 +75,9 @@ const Index = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Login/Logout Button */}
-      <div className="fixed top-4 right-4 z-50">
-        {isCheckingAuth ? (
-          <div className="bg-white rounded-lg shadow-lg p-3">
-            <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
-          </div>
-        ) : currentUser ? (
-          <div className="flex items-center space-x-2 bg-white rounded-lg shadow-lg p-2">
-            <span className="text-sm font-medium px-2">
-              {currentUser.full_name || currentUser.email}
-            </span>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-            >
-              {isLoggingOut ? (
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-              ) : (
-                <LogOut className="w-4 h-4 mr-1" />
-              )}
-              Logout
-            </Button>
-          </div>
-        ) : (
-          <Button 
-            onClick={handleLogin}
-            className="bg-orange-500 hover:bg-orange-600 shadow-lg"
-          >
-            <LogIn className="w-4 h-4 mr-2" />
-            Login
-          </Button>
-        )}
-      </div>
-
       <EnhancedHeader 
         onPlanTrip={handlePlanTrip}
-        onMyTrips={() => {
-          if (!currentUser) {
-            toast({
-              title: "Login Required",
-              description: "Please login to view your trips.",
-              variant: "destructive"
-            });
-            handleLogin();
-            return;
-          }
-          setIsMyTripsOpen(true);
-        }}
+        onMyTrips={() => setIsMyTripsOpen(true)}
         onAIAssistant={() => setIsAIAssistantOpen(true)}
       />
       <Hero onActionClick={handleActionClick} />
