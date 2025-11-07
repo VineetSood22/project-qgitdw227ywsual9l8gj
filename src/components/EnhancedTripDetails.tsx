@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { X, Calendar, MapPin, Users, Thermometer, Backpack, Plane, Train, Bus, Car, Hotel, Home, Building, Tent, Star, Clock, TrendingUp, TrendingDown, Minus, ExternalLink, Navigation, Calculator, Save, Heart } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { X, Calendar, MapPin, Users, Thermometer, Backpack, Plane, Train, Bus, Car, Hotel, Home, Building, Tent, Star, Clock, TrendingUp, TrendingDown, Minus, ExternalLink, Navigation, Calculator, Save, Heart, Edit2, Utensils, Camera, MessageSquare, ThumbsUp } from 'lucide-react';
 import { invokeLLM, generateImage } from '@/integrations/core';
 import { useToast } from '@/hooks/use-toast';
-import { Trip } from '@/entities';
+import { Trip, Review } from '@/entities';
 
 interface EnhancedTripDetailsProps {
   isOpen: boolean;
@@ -19,20 +20,29 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
   const [activeTab, setActiveTab] = useState('itinerary');
   const [accommodations, setAccommodations] = useState<any[]>([]);
   const [distanceInfo, setDistanceInfo] = useState<any>(null);
-  const [budgetBreakdown, setBudgetBreakdown] = useState<any>(null);
-  const [fromLocation, setFromLocation] = useState('');
+  const [fromLocation, setFromLocation] = useState(tripData?.from_location || '');
   const [isLoadingStays, setIsLoadingStays] = useState(false);
   const [isLoadingDistance, setIsLoadingDistance] = useState(false);
-  const [isLoadingBudget, setIsLoadingBudget] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedTrip, setEditedTrip] = useState(tripData);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [newReview, setNewReview] = useState({ rating: 5, title: '', review_text: '' });
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const { toast } = useToast();
 
   const aiPlan = tripData?.ai_plan || {};
+  const budgetBreakdown = aiPlan?.budget_breakdown || null;
 
   useEffect(() => {
     if (isOpen && tripData) {
+      setEditedTrip(tripData);
+      setFromLocation(tripData.from_location || '');
       loadAccommodations();
-      loadBudgetBreakdown();
+      loadReviews();
+      if (tripData.from_location) {
+        loadDistanceInfo();
+      }
     }
   }, [isOpen, tripData]);
 
@@ -40,7 +50,7 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
     setIsLoadingStays(true);
     try {
       const response = await invokeLLM({
-        prompt: `Find 6-8 accommodation options in ${tripData.destination} for ${tripData.travelers} travelers with ${tripData.budget} budget. Include a mix of hotels, resorts, homestays, and hostels. For each accommodation, provide: name, type, price range per night, rating, key amenities, location, description, and booking recommendation. Also generate a realistic image description for each property.`,
+        prompt: `Find 6-8 accommodation options in ${tripData.destination} for ${tripData.travelers} travelers with ${tripData.budget} budget. Include a mix of hotels, resorts, homestays, and hostels. For each accommodation, provide: name, type, price range per night, rating, key amenities, location, description, and booking recommendation.`,
         add_context_from_internet: true,
         response_json_schema: {
           type: "object",
@@ -57,8 +67,7 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
                   amenities: { type: "array", items: { type: "string" } },
                   location: { type: "string" },
                   description: { type: "string" },
-                  booking_tip: { type: "string" },
-                  image_description: { type: "string" }
+                  booking_tip: { type: "string" }
                 }
               }
             }
@@ -66,46 +75,21 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
         }
       });
       
-      // Generate images for accommodations
-      const accommodationsWithImages = await Promise.all(
-        response.accommodations.map(async (stay: any) => {
-          try {
-            const imageResponse = await generateImage({
-              prompt: `${stay.image_description}, professional hotel photography, high quality, realistic`
-            });
-            return { ...stay, image_url: imageResponse.url };
-          } catch (error) {
-            return { ...stay, image_url: null };
-          }
-        })
-      );
-      
-      setAccommodations(accommodationsWithImages || []);
+      setAccommodations(response.accommodations || []);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load accommodations",
-        variant: "destructive"
-      });
+      console.error('Failed to load accommodations:', error);
     } finally {
       setIsLoadingStays(false);
     }
   };
 
   const loadDistanceInfo = async () => {
-    if (!fromLocation) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter your starting location",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!fromLocation) return;
 
     setIsLoadingDistance(true);
     try {
       const response = await invokeLLM({
-        prompt: `Calculate travel distance and route information from ${fromLocation} to ${tripData.destination}. Include distance by different transport modes, estimated travel time, route overview, and major stops/cities along the way. Also provide a map overview description.`,
+        prompt: `Calculate travel distance and route information from ${fromLocation} to ${tripData.destination}. Include distance by different transport modes, estimated travel time, route overview, and major stops/cities along the way.`,
         add_context_from_internet: true,
         response_json_schema: {
           type: "object",
@@ -132,53 +116,59 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
       
       setDistanceInfo(response);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load distance information",
-        variant: "destructive"
-      });
+      console.error('Failed to load distance info:', error);
     } finally {
       setIsLoadingDistance(false);
     }
   };
 
-  const loadBudgetBreakdown = async () => {
-    setIsLoadingBudget(true);
+  const loadReviews = async () => {
     try {
-      const response = await invokeLLM({
-        prompt: `Create a detailed budget breakdown for a ${tripData.duration} trip to ${tripData.destination} for ${tripData.travelers} travelers with ${tripData.budget} budget. Include accommodation, food, transport, activities, shopping, and miscellaneous expenses. Provide per-person and total costs.`,
-        add_context_from_internet: true,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            total_budget: { type: "string" },
-            per_person_budget: { type: "string" },
-            breakdown: {
-              type: "object",
-              properties: {
-                accommodation: { type: "string" },
-                food: { type: "string" },
-                transport: { type: "string" },
-                activities: { type: "string" },
-                shopping: { type: "string" },
-                miscellaneous: { type: "string" }
-              }
-            },
-            daily_budget: { type: "string" },
-            budget_tips: { type: "array", items: { type: "string" } }
-          }
-        }
+      const tripReviews = await Review.filter({ trip_id: tripData.id }, '-created_at', 50);
+      setReviews(tripReviews);
+    } catch (error) {
+      console.error('Failed to load reviews:', error);
+    }
+  };
+
+  const submitReview = async () => {
+    if (!newReview.title || !newReview.review_text) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide a title and review text.",
+        variant: "destructive"
       });
-      
-      setBudgetBreakdown(response);
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    try {
+      await Review.create({
+        trip_id: tripData.id,
+        destination: tripData.destination,
+        rating: newReview.rating,
+        title: newReview.title,
+        review_text: newReview.review_text,
+        travel_date: new Date().toISOString(),
+        helpful_count: 0,
+        photos: []
+      });
+
+      toast({
+        title: "Review Submitted!",
+        description: "Thank you for sharing your experience."
+      });
+
+      setNewReview({ rating: 5, title: '', review_text: '' });
+      loadReviews();
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to load budget information",
+        description: "Failed to submit review.",
         variant: "destructive"
       });
     } finally {
-      setIsLoadingBudget(false);
+      setIsSubmittingReview(false);
     }
   };
 
@@ -186,12 +176,12 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
     setIsSaving(true);
     try {
       await Trip.update(tripData.id, {
+        name: editedTrip.name,
         status: 'saved',
         ai_suggestions: JSON.stringify({
           ...aiPlan,
           accommodations,
-          distance_info: distanceInfo,
-          budget_breakdown: budgetBreakdown
+          distance_info: distanceInfo
         })
       });
       
@@ -199,6 +189,7 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
         title: "Trip Saved!",
         description: "Your trip has been saved to your dashboard."
       });
+      setIsEditing(false);
     } catch (error) {
       toast({
         title: "Error",
@@ -211,7 +202,7 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
   };
 
   const getTransportIcon = (mode: string) => {
-    switch (mode.toLowerCase()) {
+    switch (mode?.toLowerCase()) {
       case 'flight': return <Plane className="w-4 h-4" />;
       case 'train': return <Train className="w-4 h-4" />;
       case 'bus': return <Bus className="w-4 h-4" />;
@@ -221,7 +212,7 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
   };
 
   const getAccommodationIcon = (type: string) => {
-    switch (type.toLowerCase()) {
+    switch (type?.toLowerCase()) {
       case 'hotel': return <Hotel className="w-4 h-4" />;
       case 'resort': return <Building className="w-4 h-4" />;
       case 'homestay':
@@ -232,7 +223,7 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
   };
 
   const getCrowdIcon = (level: string) => {
-    switch (level.toLowerCase()) {
+    switch (level?.toLowerCase()) {
       case 'high':
       case 'crowded': return <TrendingUp className="w-4 h-4 text-red-500" />;
       case 'low':
@@ -249,8 +240,16 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-orange-500 to-orange-600">
-            <div>
-              <h2 className="text-2xl font-bold text-white">{tripData.name}</h2>
+            <div className="flex-1">
+              {isEditing ? (
+                <Input
+                  value={editedTrip.name}
+                  onChange={(e) => setEditedTrip({ ...editedTrip, name: e.target.value })}
+                  className="text-2xl font-bold text-white bg-white/20 border-white/30"
+                />
+              ) : (
+                <h2 className="text-2xl font-bold text-white">{tripData.name}</h2>
+              )}
               <div className="flex items-center space-x-4 mt-2 text-white/90">
                 <div className="flex items-center space-x-1">
                   <MapPin className="w-4 h-4" />
@@ -270,6 +269,14 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
               <Button 
                 variant="ghost" 
                 size="sm" 
+                onClick={() => setIsEditing(!isEditing)}
+                className="text-white hover:bg-white/20"
+              >
+                <Edit2 className="w-5 h-5" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
                 onClick={saveTrip}
                 disabled={isSaving}
                 className="text-white hover:bg-white/20"
@@ -285,15 +292,17 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
           {/* Tabs */}
           <div className="flex-1 overflow-hidden">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-              <TabsList className="grid w-full grid-cols-8 bg-gray-50">
+              <TabsList className="grid w-full grid-cols-10 bg-gray-50">
                 <TabsTrigger value="itinerary">Itinerary</TabsTrigger>
                 <TabsTrigger value="stays">Stays</TabsTrigger>
+                <TabsTrigger value="cuisine">Cuisine</TabsTrigger>
+                <TabsTrigger value="explore">Explore</TabsTrigger>
                 <TabsTrigger value="weather">Weather</TabsTrigger>
                 <TabsTrigger value="places">Places</TabsTrigger>
                 <TabsTrigger value="distance">Distance</TabsTrigger>
                 <TabsTrigger value="budget">Budget</TabsTrigger>
-                <TabsTrigger value="packing">Packing</TabsTrigger>
                 <TabsTrigger value="transport">Transport</TabsTrigger>
+                <TabsTrigger value="reviews">Reviews</TabsTrigger>
               </TabsList>
 
               <div className="flex-1 overflow-y-auto p-6">
@@ -333,7 +342,7 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
                   ))}
                 </TabsContent>
 
-                {/* Enhanced Stays Tab with Images */}
+                {/* Stays Tab */}
                 <TabsContent value="stays" className="space-y-4 mt-0">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xl font-semibold">Accommodation Options</h3>
@@ -348,16 +357,7 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {accommodations.map((stay, index) => (
-                        <Card key={index} className="hover:shadow-lg transition-shadow overflow-hidden">
-                          {stay.image_url && (
-                            <div className="h-48 overflow-hidden">
-                              <img 
-                                src={stay.image_url} 
-                                alt={stay.name}
-                                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                              />
-                            </div>
-                          )}
+                        <Card key={index} className="hover:shadow-lg transition-shadow">
                           <CardHeader>
                             <CardTitle className="flex items-center justify-between">
                               <div className="flex items-center space-x-2">
@@ -393,10 +393,119 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
                                   onClick={() => window.open(`https://www.booking.com/search.html?ss=${encodeURIComponent(stay.name + ' ' + stay.location)}`, '_blank')}
                                 >
                                   <ExternalLink className="w-3 h-3 mr-1" />
-                                  Book on Booking.com
+                                  Book Now
                                 </Button>
                               </div>
                             </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Cuisine Tab */}
+                <TabsContent value="cuisine" className="space-y-4 mt-0">
+                  <h3 className="text-xl font-semibold mb-4">Local Cuisine & Food Guide</h3>
+                  {aiPlan.cuisine && (
+                    <div className="space-y-6">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center space-x-2">
+                            <Utensils className="w-5 h-5 text-orange-500" />
+                            <span>Must-Try Dishes</span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {aiPlan.cuisine.must_try_dishes?.map((dish: string, index: number) => (
+                              <div key={index} className="p-3 bg-orange-50 rounded-lg text-center">
+                                <span className="text-2xl mb-2 block">🍽️</span>
+                                <p className="text-sm font-medium">{dish}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Famous Restaurants</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {aiPlan.cuisine.famous_restaurants?.map((restaurant: any, index: number) => (
+                              <div key={index} className="p-4 border rounded-lg">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h4 className="font-semibold">{restaurant.name}</h4>
+                                  <Badge variant="outline">{restaurant.price_range}</Badge>
+                                </div>
+                                <p className="text-sm text-gray-600">{restaurant.specialty}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Street Food Delights</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {aiPlan.cuisine.street_food?.map((food: string, index: number) => (
+                              <Badge key={index} variant="secondary" className="text-sm">{food}</Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Food Tips</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-2">
+                            {aiPlan.cuisine.food_tips?.map((tip: string, index: number) => (
+                              <li key={index} className="flex items-start space-x-2">
+                                <span className="text-orange-500 mt-1">💡</span>
+                                <span className="text-sm">{tip}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Explore Tab */}
+                <TabsContent value="explore" className="space-y-4 mt-0">
+                  <h3 className="text-xl font-semibold mb-4">Things to Explore</h3>
+                  {aiPlan.things_to_explore && (
+                    <div className="space-y-4">
+                      {aiPlan.things_to_explore.map((category: any, index: number) => (
+                        <Card key={index}>
+                          <CardHeader>
+                            <CardTitle className="flex items-center space-x-2">
+                              <Camera className="w-5 h-5 text-orange-500" />
+                              <span>{category.category}</span>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ul className="space-y-2 mb-3">
+                              {category.activities?.map((activity: string, i: number) => (
+                                <li key={i} className="flex items-start space-x-2">
+                                  <span className="text-orange-500">•</span>
+                                  <span className="text-sm">{activity}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            {category.tips && (
+                              <div className="p-3 bg-blue-50 rounded-lg">
+                                <p className="text-sm text-blue-800"><strong>Tip:</strong> {category.tips}</p>
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                       ))}
@@ -439,10 +548,10 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
                   )}
                 </TabsContent>
 
-                {/* Places Tab */}
+                {/* Places Tab with Crowd Calculator */}
                 <TabsContent value="places" className="space-y-4 mt-0">
-                  <h3 className="text-xl font-semibold mb-4">Must-Visit Places</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <h3 className="text-xl font-semibold mb-4">Must-Visit Places & Crowd Meter</h3>
+                  <div className="grid grid-cols-1 gap-4">
                     {aiPlan.places?.map((place: any, index: number) => (
                       <Card key={index} className="hover:shadow-lg transition-shadow">
                         <CardHeader>
@@ -455,8 +564,33 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <div className="space-y-3">
+                          <div className="space-y-4">
                             <p className="text-sm text-gray-600">{place.description}</p>
+                            
+                            {/* Crowd Calculator by Time */}
+                            {place.crowd_by_time && (
+                              <div className="p-4 bg-gray-50 rounded-lg">
+                                <h4 className="font-medium mb-3 flex items-center space-x-2">
+                                  <Clock className="w-4 h-4 text-orange-500" />
+                                  <span>Crowd Levels by Time</span>
+                                </h4>
+                                <div className="grid grid-cols-3 gap-3">
+                                  <div className="text-center p-2 bg-white rounded">
+                                    <p className="text-xs text-gray-500 mb-1">Morning</p>
+                                    <p className="text-sm font-medium">{place.crowd_by_time.morning}</p>
+                                  </div>
+                                  <div className="text-center p-2 bg-white rounded">
+                                    <p className="text-xs text-gray-500 mb-1">Afternoon</p>
+                                    <p className="text-sm font-medium">{place.crowd_by_time.afternoon}</p>
+                                  </div>
+                                  <div className="text-center p-2 bg-white rounded">
+                                    <p className="text-xs text-gray-500 mb-1">Evening</p>
+                                    <p className="text-sm font-medium">{place.crowd_by_time.evening}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
                             <div className="flex items-center justify-between text-sm">
                               <div>
                                 <span className="font-medium">Best Time:</span>
@@ -466,14 +600,6 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
                                 <span className="font-medium">Duration:</span>
                                 <span className="ml-1 text-gray-600">{place.duration}</span>
                               </div>
-                            </div>
-                            <div className="pt-2">
-                              <Badge 
-                                variant={place.crowd_level === 'low' ? 'default' : place.crowd_level === 'high' ? 'destructive' : 'secondary'}
-                                className="text-xs"
-                              >
-                                Crowd Level: {place.crowd_level}
-                              </Badge>
                             </div>
                           </div>
                         </CardContent>
@@ -559,12 +685,7 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
                 <TabsContent value="budget" className="space-y-4 mt-0">
                   <h3 className="text-xl font-semibold mb-4">Budget Calculator</h3>
                   
-                  {isLoadingBudget ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
-                      <p className="mt-2 text-gray-600">Calculating budget breakdown...</p>
-                    </div>
-                  ) : budgetBreakdown ? (
+                  {budgetBreakdown ? (
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
@@ -639,71 +760,12 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
                   ) : (
                     <div className="text-center py-8 text-gray-500">
                       <Calculator className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                      <p>Loading budget information...</p>
+                      <p>Budget information will be available after trip generation</p>
                     </div>
                   )}
                 </TabsContent>
 
-                {/* Packing Tab */}
-                <TabsContent value="packing" className="space-y-4 mt-0">
-                  <h3 className="text-xl font-semibold mb-4">Packing Checklist</h3>
-                  {aiPlan.packing && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center space-x-2">
-                            <Backpack className="w-5 h-5 text-orange-500" />
-                            <span>Essentials</span>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="space-y-2">
-                            {aiPlan.packing.essentials?.map((item: string, index: number) => (
-                              <li key={index} className="flex items-center space-x-2">
-                                <input type="checkbox" className="rounded" />
-                                <span className="text-sm">{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Clothing</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="space-y-2">
-                            {aiPlan.packing.clothing?.map((item: string, index: number) => (
-                              <li key={index} className="flex items-center space-x-2">
-                                <input type="checkbox" className="rounded" />
-                                <span className="text-sm">{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Accessories</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="space-y-2">
-                            {aiPlan.packing.accessories?.map((item: string, index: number) => (
-                              <li key={index} className="flex items-center space-x-2">
-                                <input type="checkbox" className="rounded" />
-                                <span className="text-sm">{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* Transport Tab */}
+                {/* Transport Tab with Rental Vehicles */}
                 <TabsContent value="transport" className="space-y-4 mt-0">
                   <h3 className="text-xl font-semibold mb-4">Transportation Guide</h3>
                   {aiPlan.transport && (
@@ -711,7 +773,7 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
                       <Card>
                         <CardHeader>
                           <CardTitle className="flex items-center space-x-2">
-                            {getTransportIcon(tripData.transportMode || 'flight')}
+                            {getTransportIcon(tripData.transport_mode || 'flight')}
                             <span>Recommended Transportation</span>
                           </CardTitle>
                         </CardHeader>
@@ -727,7 +789,7 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
                               <p className="text-sm text-gray-600">{aiPlan.transport.local_transport}</p>
                             </div>
                           </div>
-                          <div className="mt-4 flex space-x-2">
+                          <div className="mt-4 flex flex-wrap gap-2">
                             <Button 
                               className="bg-blue-600 hover:bg-blue-700"
                               onClick={() => window.open('https://www.makemytrip.com/flight/', '_blank')}
@@ -752,8 +814,152 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
                           </div>
                         </CardContent>
                       </Card>
+
+                      {/* Rental Vehicles */}
+                      {aiPlan.transport.rental_options && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center space-x-2">
+                              <Car className="w-5 h-5 text-orange-500" />
+                              <span>Rental Vehicle Options</span>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {aiPlan.transport.rental_options.map((rental: any, index: number) => (
+                                <div key={index} className="p-4 border rounded-lg">
+                                  <h4 className="font-semibold mb-2">{rental.type}</h4>
+                                  <p className="text-sm text-gray-600 mb-2">
+                                    <span className="font-medium">Price Range:</span> {rental.price_range}
+                                  </p>
+                                  <div>
+                                    <p className="text-sm font-medium mb-1">Providers:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {rental.providers?.map((provider: string, i: number) => (
+                                        <Badge key={i} variant="secondary" className="text-xs">{provider}</Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              <Button 
+                                variant="outline"
+                                onClick={() => window.open('https://www.zoomcar.com/', '_blank')}
+                              >
+                                Zoomcar
+                              </Button>
+                              <Button 
+                                variant="outline"
+                                onClick={() => window.open('https://www.revv.co.in/', '_blank')}
+                              >
+                                Revv
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
                     </div>
                   )}
+                </TabsContent>
+
+                {/* Reviews Tab */}
+                <TabsContent value="reviews" className="space-y-4 mt-0">
+                  <h3 className="text-xl font-semibold mb-4">Reviews & Experiences</h3>
+                  
+                  {/* Write Review */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <MessageSquare className="w-5 h-5 text-orange-500" />
+                        <span>Share Your Experience</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Rating</label>
+                          <div className="flex items-center space-x-2">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`w-6 h-6 cursor-pointer ${
+                                  star <= newReview.rating
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'text-gray-300'
+                                }`}
+                                onClick={() => setNewReview({ ...newReview, rating: star })}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Title</label>
+                          <Input
+                            placeholder="Summarize your experience"
+                            value={newReview.title}
+                            onChange={(e) => setNewReview({ ...newReview, title: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Your Review</label>
+                          <Textarea
+                            placeholder="Share your thoughts about this trip..."
+                            value={newReview.review_text}
+                            onChange={(e) => setNewReview({ ...newReview, review_text: e.target.value })}
+                            rows={4}
+                          />
+                        </div>
+                        <Button 
+                          onClick={submitReview}
+                          disabled={isSubmittingReview}
+                          className="bg-orange-500 hover:bg-orange-600"
+                        >
+                          {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Display Reviews */}
+                  <div className="space-y-4">
+                    {reviews.map((review) => (
+                      <Card key={review.id}>
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <CardTitle className="text-lg">{review.title}</CardTitle>
+                              <div className="flex items-center space-x-2 mt-1">
+                                <div className="flex">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <Star
+                                      key={star}
+                                      className={`w-4 h-4 ${
+                                        star <= review.rating
+                                          ? 'fill-yellow-400 text-yellow-400'
+                                          : 'text-gray-300'
+                                      }`}
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-sm text-gray-500">
+                                  {new Date(review.created_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </div>
+                            <Button variant="ghost" size="sm">
+                              <ThumbsUp className="w-4 h-4 mr-1" />
+                              {review.helpful_count || 0}
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-gray-600">{review.review_text}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 </TabsContent>
               </div>
             </Tabs>

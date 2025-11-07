@@ -10,6 +10,10 @@
       "type": "string",
       "description": "Primary destination of the trip"
     },
+    "from_location": {
+      "type": "string",
+      "description": "Starting location"
+    },
     "duration": {
       "type": "string",
       "description": "Duration of the trip (e.g., '5 days', '2 weeks')"
@@ -22,9 +26,24 @@
       "type": "string",
       "description": "Budget range for the trip"
     },
+    "custom_budget": {
+      "type": "number",
+      "description": "Custom budget amount in INR"
+    },
     "is_road_trip": {
       "type": "boolean",
       "description": "Whether this is a road trip"
+    },
+    "transport_mode": {
+      "type": "string",
+      "description": "Preferred transport mode"
+    },
+    "interests": {
+      "type": "array",
+      "description": "User interests for the trip",
+      "items": {
+        "type": "string"
+      }
     },
     "additional_locations": {
       "type": "array",
@@ -39,7 +58,7 @@
     },
     "status": {
       "type": "string",
-      "description": "Status of the trip (planning, confirmed, completed)"
+      "description": "Status of the trip (planning, confirmed, completed, saved)"
     }
   }
 }

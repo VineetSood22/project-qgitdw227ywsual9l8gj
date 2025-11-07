@@ -1,0 +1,56 @@
+{
+  "name": "Package",
+  "description": "Predefined travel packages",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Package name"
+    },
+    "destination": {
+      "type": "string",
+      "description": "Primary destination"
+    },
+    "state": {
+      "type": "string",
+      "description": "State"
+    },
+    "duration": {
+      "type": "string",
+      "description": "Package duration"
+    },
+    "price_per_person": {
+      "type": "string",
+      "description": "Price per person"
+    },
+    "description": {
+      "type": "string",
+      "description": "Package description"
+    },
+    "highlights": {
+      "type": "array",
+      "description": "Package highlights",
+      "items": {
+        "type": "string"
+      }
+    },
+    "inclusions": {
+      "type": "array",
+      "description": "What's included",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image_url": {
+      "type": "string",
+      "description": "Package image"
+    },
+    "category": {
+      "type": "string",
+      "description": "Package category (adventure, heritage, beach, etc.)"
+    },
+    "rating": {
+      "type": "number",
+      "description": "Package rating"
+    }
+  }
+}

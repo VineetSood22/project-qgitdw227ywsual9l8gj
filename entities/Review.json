@@ -1,0 +1,41 @@
+{
+  "name": "Review",
+  "description": "User reviews for trips and destinations",
+  "properties": {
+    "trip_id": {
+      "type": "string",
+      "description": "Associated trip ID"
+    },
+    "destination": {
+      "type": "string",
+      "description": "Destination reviewed"
+    },
+    "rating": {
+      "type": "number",
+      "description": "Rating out of 5"
+    },
+    "title": {
+      "type": "string",
+      "description": "Review title"
+    },
+    "review_text": {
+      "type": "string",
+      "description": "Review content"
+    },
+    "photos": {
+      "type": "array",
+      "description": "Review photos",
+      "items": {
+        "type": "string"
+      }
+    },
+    "travel_date": {
+      "type": "string",
+      "description": "When they traveled"
+    },
+    "helpful_count": {
+      "type": "number",
+      "description": "Number of helpful votes"
+    }
+  }
+}

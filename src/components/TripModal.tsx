@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { X, Plus, MapPin, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { X, Plus, MapPin, Loader2, DollarSign } from 'lucide-react';
 import { Trip } from '@/entities';
 import { useToast } from '@/hooks/use-toast';
 import { invokeLLM } from '@/integrations/core';
@@ -22,17 +23,33 @@ const indianStates = [
   'Uttarakhand', 'West Bengal', 'Delhi', 'Jammu & Kashmir', 'Ladakh', 'Andaman & Nicobar Islands'
 ];
 
+const travelInterests = [
+  { id: 'adventure', label: 'Adventure Sports', icon: '🏔️' },
+  { id: 'culture', label: 'Culture & Heritage', icon: '🏛️' },
+  { id: 'food', label: 'Food & Cuisine', icon: '🍛' },
+  { id: 'nature', label: 'Nature & Wildlife', icon: '🌿' },
+  { id: 'photography', label: 'Photography', icon: '📸' },
+  { id: 'spiritual', label: 'Spiritual & Wellness', icon: '🕉️' },
+  { id: 'shopping', label: 'Shopping', icon: '🛍️' },
+  { id: 'nightlife', label: 'Nightlife & Entertainment', icon: '🎭' },
+  { id: 'beach', label: 'Beach & Water Sports', icon: '🏖️' },
+  { id: 'trekking', label: 'Trekking & Hiking', icon: '🥾' }
+];
+
 export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     state: '',
     destination: '',
+    fromLocation: '',
     duration: '5 days',
     travelers: 2,
-    budget: 'flexible',
+    budget: 'custom',
+    customBudget: '',
     isRoadTrip: false,
     additionalLocations: [] as string[],
-    transportMode: 'flight'
+    transportMode: 'flight',
+    interests: [] as string[]
   });
   const [availablePlaces, setAvailablePlaces] = useState<string[]>([]);
   const [newLocation, setNewLocation] = useState('');
@@ -63,11 +80,29 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
     }
   };
 
+  const toggleInterest = (interestId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      interests: prev.interests.includes(interestId)
+        ? prev.interests.filter(id => id !== interestId)
+        : [...prev.interests, interestId]
+    }));
+  };
+
   const handleSubmit = async () => {
-    if (!formData.name || !formData.state || !formData.destination) {
+    if (!formData.name || !formData.state || !formData.destination || !formData.fromLocation) {
       toast({
         title: "Missing Information",
-        description: "Please fill in the trip name, state, and destination.",
+        description: "Please fill in trip name, starting location, state, and destination.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (formData.budget === 'custom' && !formData.customBudget) {
+      toast({
+        title: "Missing Budget",
+        description: "Please enter your budget amount.",
         variant: "destructive"
       });
       return;
@@ -76,15 +111,32 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
     setIsGenerating(true);
 
     try {
+      const budgetInfo = formData.budget === 'custom' 
+        ? `₹${formData.customBudget} per person`
+        : formData.budget;
+
+      const interestsList = formData.interests.map(id => 
+        travelInterests.find(i => i.id === id)?.label
+      ).filter(Boolean).join(', ');
+
       // Generate comprehensive trip plan using AI
       const tripPlan = await invokeLLM({
-        prompt: `Create a comprehensive travel plan for a ${formData.duration} trip to ${formData.destination}, ${formData.state}, India for ${formData.travelers} travelers with ${formData.budget} budget. Include:
+        prompt: `Create a comprehensive travel plan for a ${formData.duration} trip from ${formData.fromLocation} to ${formData.destination}, ${formData.state}, India for ${formData.travelers} travelers with budget ${budgetInfo}. 
         
+        User interests: ${interestsList || 'General sightseeing'}
+        Transport mode: ${formData.transportMode}
+        ${formData.isRoadTrip ? 'This is a road trip.' : ''}
+        ${formData.additionalLocations.length > 0 ? `Also visiting: ${formData.additionalLocations.join(', ')}` : ''}
+        
+        Include:
         1. Day-by-day detailed itinerary with activities, timings, and recommendations
         2. Weather overview for the travel period
-        3. Top 6-7 must-visit places with crowd meter information (best times to visit)
-        4. Essential items to pack based on destination and season
-        5. Transportation recommendations for ${formData.transportMode}
+        3. Top 6-7 must-visit places with crowd meter information (best times to visit, crowd levels by time of day)
+        4. Famous local cuisine and food recommendations (dishes, restaurants, street food)
+        5. Things to explore based on user interests
+        6. Essential items to pack based on destination and season
+        7. Transportation recommendations
+        8. Detailed budget breakdown
         
         Format the response as a detailed travel guide with practical information.`,
         add_context_from_internet: true,
@@ -122,7 +174,42 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
                   description: { type: "string" },
                   best_time: { type: "string" },
                   crowd_level: { type: "string" },
-                  duration: { type: "string" }
+                  duration: { type: "string" },
+                  crowd_by_time: {
+                    type: "object",
+                    properties: {
+                      morning: { type: "string" },
+                      afternoon: { type: "string" },
+                      evening: { type: "string" }
+                    }
+                  }
+                }
+              }
+            },
+            cuisine: {
+              type: "object",
+              properties: {
+                must_try_dishes: { type: "array", items: { type: "string" } },
+                famous_restaurants: { type: "array", items: { 
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    specialty: { type: "string" },
+                    price_range: { type: "string" }
+                  }
+                }},
+                street_food: { type: "array", items: { type: "string" } },
+                food_tips: { type: "array", items: { type: "string" } }
+              }
+            },
+            things_to_explore: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  category: { type: "string" },
+                  activities: { type: "array", items: { type: "string" } },
+                  tips: { type: "string" }
                 }
               }
             },
@@ -139,7 +226,35 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
               properties: {
                 recommendations: { type: "string" },
                 booking_tips: { type: "string" },
-                local_transport: { type: "string" }
+                local_transport: { type: "string" },
+                rental_options: { type: "array", items: {
+                  type: "object",
+                  properties: {
+                    type: { type: "string" },
+                    price_range: { type: "string" },
+                    providers: { type: "array", items: { type: "string" } }
+                  }
+                }}
+              }
+            },
+            budget_breakdown: {
+              type: "object",
+              properties: {
+                total_budget: { type: "string" },
+                per_person_budget: { type: "string" },
+                breakdown: {
+                  type: "object",
+                  properties: {
+                    accommodation: { type: "string" },
+                    food: { type: "string" },
+                    transport: { type: "string" },
+                    activities: { type: "string" },
+                    shopping: { type: "string" },
+                    miscellaneous: { type: "string" }
+                  }
+                },
+                daily_budget: { type: "string" },
+                budget_tips: { type: "array", items: { type: "string" } }
               }
             }
           }
@@ -149,10 +264,14 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
       const tripRecord = await Trip.create({
         name: formData.name,
         destination: `${formData.destination}, ${formData.state}`,
+        from_location: formData.fromLocation,
         duration: formData.duration,
         travelers: formData.travelers,
         budget: formData.budget,
+        custom_budget: formData.budget === 'custom' ? parseFloat(formData.customBudget) : null,
         is_road_trip: formData.isRoadTrip,
+        transport_mode: formData.transportMode,
+        interests: formData.interests,
         additional_locations: formData.additionalLocations,
         ai_suggestions: JSON.stringify(tripPlan),
         status: 'planning'
@@ -171,15 +290,19 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
         name: '',
         state: '',
         destination: '',
+        fromLocation: '',
         duration: '5 days',
         travelers: 2,
-        budget: 'flexible',
+        budget: 'custom',
+        customBudget: '',
         isRoadTrip: false,
         additionalLocations: [],
-        transportMode: 'flight'
+        transportMode: 'flight',
+        interests: []
       });
       setAvailablePlaces([]);
     } catch (error) {
+      console.error('Trip generation error:', error);
       toast({
         title: "Error",
         description: "Failed to generate trip. Please try again.",
@@ -211,49 +334,35 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
+        <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
           <h2 className="text-2xl font-bold">Create Your Indian Adventure</h2>
           <Button variant="ghost" size="sm" onClick={onClose} disabled={isGenerating}>
             <X className="w-5 h-5" />
           </Button>
         </div>
 
-        {/* Loading Animation */}
-        {isGenerating && (
-          <div className="absolute inset-0 bg-white/95 flex items-center justify-center z-10 rounded-2xl">
-            <div className="text-center">
-              <Loader2 className="w-12 h-12 animate-spin text-orange-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Generating Your Perfect Trip</h3>
-              <p className="text-gray-600">Our AI is crafting a personalized itinerary just for you...</p>
-              <div className="mt-4 space-y-2 text-sm text-gray-500">
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                  <span>Analyzing destinations</span>
-                </div>
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse delay-100"></div>
-                  <span>Planning activities</span>
-                </div>
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse delay-200"></div>
-                  <span>Finding best accommodations</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Form */}
         <div className="p-6 space-y-6">
           {/* Trip Name */}
           <div>
+            <label className="block text-sm font-medium mb-2">Trip Name</label>
             <Input
-              placeholder="Trip Name (e.g., Himalayan Adventure)"
+              placeholder="e.g., Himalayan Adventure"
               value={formData.name}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              className="text-lg"
+              disabled={isGenerating}
+            />
+          </div>
+
+          {/* From Location */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Starting From</label>
+            <Input
+              placeholder="e.g., Delhi, Mumbai, Bangalore"
+              value={formData.fromLocation}
+              onChange={(e) => setFormData(prev => ({ ...prev, fromLocation: e.target.value }))}
               disabled={isGenerating}
             />
           </div>
@@ -352,6 +461,31 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
             </div>
           </div>
 
+          {/* Travel Interests */}
+          <div>
+            <h3 className="font-semibold mb-3">What interests you?</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {travelInterests.map((interest) => (
+                <div 
+                  key={interest.id}
+                  className={`flex items-center space-x-2 p-3 border rounded-lg cursor-pointer transition-all ${
+                    formData.interests.includes(interest.id) 
+                      ? 'border-orange-500 bg-orange-50' 
+                      : 'hover:border-gray-300'
+                  }`}
+                  onClick={() => toggleInterest(interest.id)}
+                >
+                  <Checkbox 
+                    checked={formData.interests.includes(interest.id)}
+                    disabled={isGenerating}
+                  />
+                  <span className="text-xl">{interest.icon}</span>
+                  <span className="text-sm">{interest.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Transport Mode */}
           <div>
             <h3 className="font-semibold mb-3">Preferred Transport</h3>
@@ -373,7 +507,7 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
             </Select>
           </div>
 
-          {/* When */}
+          {/* Duration */}
           <div>
             <h3 className="font-semibold mb-3">Duration</h3>
             <Select 
@@ -397,7 +531,7 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
             </Select>
           </div>
 
-          {/* Who */}
+          {/* Travelers */}
           <div>
             <h3 className="font-semibold mb-3">Travelers</h3>
             <Select 
@@ -435,9 +569,26 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
                 <SelectItem value="moderate">Moderate (₹15,000-30,000)</SelectItem>
                 <SelectItem value="comfortable">Comfortable (₹30,000-60,000)</SelectItem>
                 <SelectItem value="luxury">Luxury (₹60,000+)</SelectItem>
-                <SelectItem value="flexible">Flexible budget</SelectItem>
+                <SelectItem value="custom">Custom Budget</SelectItem>
               </SelectContent>
             </Select>
+            
+            {formData.budget === 'custom' && (
+              <div className="mt-3">
+                <label className="block text-sm font-medium mb-2">Enter your budget (₹)</label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    type="number"
+                    placeholder="e.g., 25000"
+                    value={formData.customBudget}
+                    onChange={(e) => setFormData(prev => ({ ...prev, customBudget: e.target.value }))}
+                    disabled={isGenerating}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Submit Button */}
