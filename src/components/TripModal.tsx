@@ -23,6 +23,42 @@ const indianStates = [
   'Uttarakhand', 'West Bengal', 'Delhi', 'Jammu & Kashmir', 'Ladakh', 'Andaman & Nicobar Islands'
 ];
 
+// Fallback destinations for each state
+const stateDestinations: Record<string, string[]> = {
+  'Himachal Pradesh': ['Shimla', 'Manali', 'Dharamshala', 'Kullu', 'Kasol', 'Spiti Valley', 'Dalhousie', 'Mcleodganj', 'Bir Billing', 'Kasauli'],
+  'Rajasthan': ['Jaipur', 'Udaipur', 'Jodhpur', 'Jaisalmer', 'Pushkar', 'Mount Abu', 'Bikaner', 'Ajmer', 'Ranthambore', 'Chittorgarh'],
+  'Kerala': ['Munnar', 'Alleppey', 'Kochi', 'Wayanad', 'Thekkady', 'Kovalam', 'Varkala', 'Kumarakom', 'Vagamon', 'Athirapally'],
+  'Goa': ['North Goa', 'South Goa', 'Panjim', 'Calangute', 'Baga', 'Anjuna', 'Palolem', 'Arambol', 'Candolim', 'Vagator'],
+  'Uttarakhand': ['Nainital', 'Mussoorie', 'Rishikesh', 'Haridwar', 'Auli', 'Jim Corbett', 'Dehradun', 'Ranikhet', 'Almora', 'Chopta'],
+  'Maharashtra': ['Mumbai', 'Pune', 'Lonavala', 'Mahabaleshwar', 'Nashik', 'Aurangabad', 'Alibaug', 'Matheran', 'Kolhapur', 'Shirdi'],
+  'Karnataka': ['Bangalore', 'Mysore', 'Coorg', 'Hampi', 'Gokarna', 'Chikmagalur', 'Udupi', 'Mangalore', 'Badami', 'Kabini'],
+  'Tamil Nadu': ['Chennai', 'Ooty', 'Kodaikanal', 'Madurai', 'Rameswaram', 'Kanyakumari', 'Pondicherry', 'Mahabalipuram', 'Thanjavur', 'Coimbatore'],
+  'West Bengal': ['Kolkata', 'Darjeeling', 'Kalimpong', 'Sundarbans', 'Digha', 'Mandarmani', 'Shantiniketan', 'Dooars', 'Murshidabad', 'Siliguri'],
+  'Jammu & Kashmir': ['Srinagar', 'Gulmarg', 'Pahalgam', 'Sonamarg', 'Leh', 'Jammu', 'Patnitop', 'Yusmarg', 'Doodhpathri', 'Aru Valley'],
+  'Ladakh': ['Leh', 'Nubra Valley', 'Pangong Lake', 'Tso Moriri', 'Khardung La', 'Zanskar', 'Kargil', 'Lamayuru', 'Diskit', 'Hanle'],
+  'Gujarat': ['Ahmedabad', 'Gir National Park', 'Rann of Kutch', 'Dwarka', 'Somnath', 'Vadodara', 'Saputara', 'Diu', 'Champaner', 'Statue of Unity'],
+  'Andhra Pradesh': ['Visakhapatnam', 'Tirupati', 'Araku Valley', 'Vijayawada', 'Amaravati', 'Ananthagiri Hills', 'Horsley Hills', 'Nagarjuna Sagar', 'Srisailam', 'Gandikota'],
+  'Telangana': ['Hyderabad', 'Warangal', 'Ramoji Film City', 'Nagarjuna Sagar', 'Khammam', 'Nizamabad', 'Medak', 'Ananthagiri Hills', 'Pochampally', 'Yadagirigutta'],
+  'Madhya Pradesh': ['Bhopal', 'Indore', 'Khajuraho', 'Pachmarhi', 'Ujjain', 'Gwalior', 'Orchha', 'Sanchi', 'Kanha National Park', 'Bandhavgarh'],
+  'Odisha': ['Puri', 'Bhubaneswar', 'Konark', 'Chilika Lake', 'Gopalpur', 'Simlipal', 'Cuttack', 'Dhauli', 'Raghurajpur', 'Chandipur'],
+  'Assam': ['Guwahati', 'Kaziranga', 'Majuli', 'Tezpur', 'Jorhat', 'Sivasagar', 'Haflong', 'Manas National Park', 'Nameri', 'Dibru-Saikhowa'],
+  'Sikkim': ['Gangtok', 'Pelling', 'Lachung', 'Lachen', 'Namchi', 'Yuksom', 'Ravangla', 'Zuluk', 'Tsomgo Lake', 'Nathula Pass'],
+  'Arunachal Pradesh': ['Tawang', 'Ziro', 'Bomdila', 'Itanagar', 'Namdapha', 'Dirang', 'Pasighat', 'Mechuka', 'Bhalukpong', 'Sela Pass'],
+  'Meghalaya': ['Shillong', 'Cherrapunji', 'Mawlynnong', 'Dawki', 'Mawsynram', 'Nongriat', 'Elephant Falls', 'Umiam Lake', 'Laitlum Canyon', 'Krangsuri Falls'],
+  'Delhi': ['India Gate', 'Red Fort', 'Qutub Minar', 'Lotus Temple', 'Akshardham', 'Humayuns Tomb', 'Chandni Chowk', 'Connaught Place', 'Hauz Khas', 'Lodhi Garden'],
+  'Punjab': ['Amritsar', 'Chandigarh', 'Ludhiana', 'Patiala', 'Jalandhar', 'Anandpur Sahib', 'Kapurthala', 'Pathankot', 'Ropar', 'Bathinda'],
+  'Haryana': ['Gurgaon', 'Faridabad', 'Kurukshetra', 'Panchkula', 'Ambala', 'Karnal', 'Panipat', 'Morni Hills', 'Surajkund', 'Sultanpur'],
+  'Bihar': ['Patna', 'Bodh Gaya', 'Nalanda', 'Rajgir', 'Vaishali', 'Gaya', 'Muzaffarpur', 'Vikramshila', 'Sasaram', 'Madhubani'],
+  'Jharkhand': ['Ranchi', 'Jamshedpur', 'Netarhat', 'Deoghar', 'Hazaribagh', 'Betla National Park', 'Parasnath', 'Dalma Wildlife Sanctuary', 'Topchanchi', 'Hundru Falls'],
+  'Chhattisgarh': ['Raipur', 'Chitrakote Falls', 'Bastar', 'Jagdalpur', 'Barnawapara', 'Sirpur', 'Kanger Valley', 'Tirathgarh Falls', 'Mainpat', 'Bilaspur'],
+  'Uttar Pradesh': ['Agra', 'Varanasi', 'Lucknow', 'Mathura', 'Vrindavan', 'Allahabad', 'Ayodhya', 'Nainital', 'Sarnath', 'Fatehpur Sikri'],
+  'Tripura': ['Agartala', 'Udaipur', 'Neermahal', 'Sepahijala', 'Unakoti', 'Jampui Hills', 'Pilak', 'Dumboor Lake', 'Kamalasagar', 'Melaghar'],
+  'Manipur': ['Imphal', 'Loktak Lake', 'Kangla Fort', 'Keibul Lamjao', 'Moreh', 'Ukhrul', 'Churachandpur', 'Dzukou Valley', 'Khonghampat', 'Sendra'],
+  'Mizoram': ['Aizawl', 'Champhai', 'Lunglei', 'Serchhip', 'Reiek', 'Vantawng Falls', 'Phawngpui', 'Tamdil Lake', 'Dampa Tiger Reserve', 'Murlen'],
+  'Nagaland': ['Kohima', 'Dimapur', 'Mokokchung', 'Wokha', 'Dzukou Valley', 'Khonoma', 'Mon', 'Tuophema', 'Japfu Peak', 'Longwa'],
+  'Andaman & Nicobar Islands': ['Port Blair', 'Havelock Island', 'Neil Island', 'Ross Island', 'Baratang', 'Diglipur', 'Radhanagar Beach', 'Cellular Jail', 'North Bay', 'Jolly Buoy']
+};
+
 const travelInterests = [
   { id: 'adventure', label: 'Adventure Sports', icon: '🏔️' },
   { id: 'culture', label: 'Culture & Heritage', icon: '🏛️' },
@@ -61,6 +97,11 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
     setFormData(prev => ({ ...prev, state, destination: '' }));
     setIsLoadingPlaces(true);
     
+    // First, set fallback destinations immediately
+    const fallbackPlaces = stateDestinations[state] || [];
+    setAvailablePlaces(fallbackPlaces);
+    
+    // Then try to get AI-enhanced list
     try {
       const response = await invokeLLM({
         prompt: `List the top 15-20 most famous tourist destinations, cities, districts, and places to visit in ${state}, India. Include popular hill stations, beaches, heritage sites, spiritual places, and adventure destinations. Return only the place names separated by commas, no descriptions.`,
@@ -68,13 +109,18 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
       });
       
       const places = response.split(',').map((place: string) => place.trim()).filter(Boolean);
-      setAvailablePlaces(places);
+      if (places.length > 0) {
+        setAvailablePlaces(places);
+      }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load places. Please try again.",
-        variant: "destructive"
-      });
+      console.error('Failed to load AI places, using fallback:', error);
+      // Fallback is already set, so just show a subtle message
+      if (fallbackPlaces.length === 0) {
+        toast({
+          title: "Using default destinations",
+          description: "Showing popular places in " + state,
+        });
+      }
     } finally {
       setIsLoadingPlaces(false);
     }
@@ -397,10 +443,10 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
                   <Select 
                     value={formData.destination} 
                     onValueChange={(value) => setFormData(prev => ({ ...prev, destination: value }))}
-                    disabled={isLoadingPlaces || isGenerating}
+                    disabled={isLoadingPlaces || isGenerating || availablePlaces.length === 0}
                   >
                     <SelectTrigger className="border-none shadow-none">
-                      <SelectValue placeholder={isLoadingPlaces ? "Loading places..." : "Select Destination"} />
+                      <SelectValue placeholder={isLoadingPlaces ? "Loading places..." : availablePlaces.length === 0 ? "No places available" : "Select Destination"} />
                     </SelectTrigger>
                     <SelectContent>
                       {availablePlaces.map((place) => (
@@ -413,7 +459,7 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
               )}
 
               {/* Additional Locations */}
-              {formData.destination && (
+              {formData.destination && availablePlaces.length > 0 && (
                 <div className="flex items-center space-x-2">
                   <Select value={newLocation} onValueChange={setNewLocation} disabled={isGenerating}>
                     <SelectTrigger>
@@ -473,7 +519,7 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
                       ? 'border-orange-500 bg-orange-50' 
                       : 'hover:border-gray-300'
                   }`}
-                  onClick={() => toggleInterest(interest.id)}
+                  onClick={() => !isGenerating && toggleInterest(interest.id)}
                 >
                   <Checkbox 
                     checked={formData.interests.includes(interest.id)}
@@ -498,112 +544,95 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="flight">Flight</SelectItem>
-                <SelectItem value="train">Train</SelectItem>
-                <SelectItem value="bus">Bus</SelectItem>
-                <SelectItem value="car">Car/Self Drive</SelectItem>
-                <SelectItem value="mixed">Mixed Transport</SelectItem>
+                <SelectItem value="flight">✈️ Flight</SelectItem>
+                <SelectItem value="train">🚂 Train</SelectItem>
+                <SelectItem value="bus">🚌 Bus</SelectItem>
+                <SelectItem value="car">🚗 Car</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Duration */}
-          <div>
-            <h3 className="font-semibold mb-3">Duration</h3>
-            <Select 
-              value={formData.duration} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, duration: value }))}
-              disabled={isGenerating}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="2 days">2 days</SelectItem>
-                <SelectItem value="3 days">3 days</SelectItem>
-                <SelectItem value="5 days">5 days</SelectItem>
-                <SelectItem value="1 week">1 week</SelectItem>
-                <SelectItem value="10 days">10 days</SelectItem>
-                <SelectItem value="2 weeks">2 weeks</SelectItem>
-                <SelectItem value="3 weeks">3 weeks</SelectItem>
-                <SelectItem value="1 month">1 month</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Travelers */}
-          <div>
-            <h3 className="font-semibold mb-3">Travelers</h3>
-            <Select 
-              value={formData.travelers.toString()} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, travelers: parseInt(value) }))}
-              disabled={isGenerating}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1 traveler</SelectItem>
-                <SelectItem value="2">2 travelers</SelectItem>
-                <SelectItem value="3">3 travelers</SelectItem>
-                <SelectItem value="4">4 travelers</SelectItem>
-                <SelectItem value="5">5 travelers</SelectItem>
-                <SelectItem value="6">6+ travelers</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Duration & Travelers */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Duration</label>
+              <Select 
+                value={formData.duration} 
+                onValueChange={(value) => setFormData(prev => ({ ...prev, duration: value }))}
+                disabled={isGenerating}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="3 days">3 days</SelectItem>
+                  <SelectItem value="5 days">5 days</SelectItem>
+                  <SelectItem value="7 days">7 days</SelectItem>
+                  <SelectItem value="10 days">10 days</SelectItem>
+                  <SelectItem value="2 weeks">2 weeks</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Travelers</label>
+              <Input
+                type="number"
+                min="1"
+                value={formData.travelers}
+                onChange={(e) => setFormData(prev => ({ ...prev, travelers: parseInt(e.target.value) || 1 }))}
+                disabled={isGenerating}
+              />
+            </div>
           </div>
 
           {/* Budget */}
           <div>
-            <h3 className="font-semibold mb-3">Budget per person</h3>
-            <Select 
-              value={formData.budget} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, budget: value }))}
-              disabled={isGenerating}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="budget">Budget (₹5,000-15,000)</SelectItem>
-                <SelectItem value="moderate">Moderate (₹15,000-30,000)</SelectItem>
-                <SelectItem value="comfortable">Comfortable (₹30,000-60,000)</SelectItem>
-                <SelectItem value="luxury">Luxury (₹60,000+)</SelectItem>
-                <SelectItem value="custom">Custom Budget</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            {formData.budget === 'custom' && (
-              <div className="mt-3">
-                <label className="block text-sm font-medium mb-2">Enter your budget (₹)</label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <h3 className="font-semibold mb-3">Budget (per person)</h3>
+            <div className="space-y-3">
+              <Select 
+                value={formData.budget} 
+                onValueChange={(value) => setFormData(prev => ({ ...prev, budget: value }))}
+                disabled={isGenerating}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="budget">💰 Budget (₹10k-20k)</SelectItem>
+                  <SelectItem value="moderate">💵 Moderate (₹20k-40k)</SelectItem>
+                  <SelectItem value="luxury">💎 Luxury (₹40k+)</SelectItem>
+                  <SelectItem value="custom">✏️ Custom Amount</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {formData.budget === 'custom' && (
+                <div className="flex items-center space-x-2">
+                  <DollarSign className="w-5 h-5 text-gray-400" />
                   <Input
                     type="number"
-                    placeholder="e.g., 25000"
+                    placeholder="Enter amount in ₹"
                     value={formData.customBudget}
                     onChange={(e) => setFormData(prev => ({ ...prev, customBudget: e.target.value }))}
                     disabled={isGenerating}
-                    className="pl-10"
                   />
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          {/* Submit Button */}
+          {/* Generate Button */}
           <Button 
             onClick={handleSubmit} 
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3"
+            className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700"
             disabled={isGenerating}
           >
             {isGenerating ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating Trip...
+                Generating Your Perfect Trip...
               </>
             ) : (
-              'Generate My Trip'
+              'Generate Trip Plan'
             )}
           </Button>
         </div>
