@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Package } from '@/entities';
-import { MapPin, Calendar, Users, Star, ExternalLink } from 'lucide-react';
+import { MapPin, Calendar, Star, PackageOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface PackagesGalleryProps {
@@ -23,14 +23,12 @@ export function PackagesGallery({ onSelectPackage }: PackagesGalleryProps) {
     setIsLoading(true);
     try {
       const allPackages = await Package.list('-rating', 20);
-      setPackages(allPackages);
+      console.log('Loaded packages:', allPackages);
+      setPackages(allPackages || []);
     } catch (error) {
       console.error('Failed to load packages:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load packages",
-        variant: "destructive"
-      });
+      // Don't show error toast, just set empty array
+      setPackages([]);
     } finally {
       setIsLoading(false);
     }
@@ -38,10 +36,32 @@ export function PackagesGallery({ onSelectPackage }: PackagesGalleryProps) {
 
   if (isLoading) {
     return (
-      <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading packages...</p>
-      </div>
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading packages...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (packages.length === 0) {
+    return (
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-4">Curated Travel Packages</h2>
+            <p className="text-gray-600">Handpicked packages for unforgettable experiences</p>
+          </div>
+          <div className="text-center py-12">
+            <PackageOpen className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+            <p className="text-gray-500">No packages available at the moment.</p>
+            <p className="text-sm text-gray-400 mt-2">Check back soon for exciting travel packages!</p>
+          </div>
+        </div>
+      </section>
     );
   }
 

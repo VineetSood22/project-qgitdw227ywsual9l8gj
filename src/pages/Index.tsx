@@ -12,7 +12,7 @@ import { Footer } from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@/entities';
-import { LogIn, LogOut } from 'lucide-react';
+import { LogIn, LogOut, Loader2 } from 'lucide-react';
 
 const Index = () => {
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
@@ -23,6 +23,8 @@ const Index = () => {
   const [currentTrip, setCurrentTrip] = useState(null);
   const [generatingTrip, setGeneratingTrip] = useState(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -30,19 +32,26 @@ const Index = () => {
   }, []);
 
   const checkUser = async () => {
+    setIsCheckingAuth(true);
     try {
       const user = await User.me();
+      console.log('Current user:', user);
       setCurrentUser(user);
     } catch (error) {
-      // User not logged in
+      console.log('User not logged in:', error);
       setCurrentUser(null);
+    } finally {
+      setIsCheckingAuth(false);
     }
   };
 
   const handleLogin = async () => {
     try {
+      console.log('Initiating login...');
       await User.login();
+      // After login redirect, user will be checked again
     } catch (error) {
+      console.error('Login error:', error);
       toast({
         title: "Login Error",
         description: "Failed to login. Please try again.",
@@ -52,6 +61,7 @@ const Index = () => {
   };
 
   const handleLogout = async () => {
+    setIsLoggingOut(true);
     try {
       await User.logout();
       setCurrentUser(null);
@@ -60,11 +70,14 @@ const Index = () => {
         description: "You have been successfully logged out."
       });
     } catch (error) {
+      console.error('Logout error:', error);
       toast({
         title: "Logout Error",
         description: "Failed to logout. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -92,7 +105,6 @@ const Index = () => {
       return;
     }
     
-    // Pre-fill trip modal with package data
     toast({
       title: "Package Selected",
       description: `Creating trip based on ${pkg.name}`,
@@ -101,19 +113,21 @@ const Index = () => {
   };
 
   const handleTripCreated = (tripData: any) => {
+    console.log('Trip created:', tripData);
     setGeneratingTrip(tripData);
     setIsTripGenerationOpen(true);
     setIsTripModalOpen(false);
   };
 
   const handleGenerationComplete = (generatedTrip: any) => {
+    console.log('Trip generation complete:', generatedTrip);
     setCurrentTrip(generatedTrip);
     setIsTripGenerationOpen(false);
     setIsTripDetailsOpen(true);
   };
 
   const handleViewTrip = (trip: any) => {
-    // Parse AI suggestions if they exist
+    console.log('Viewing trip:', trip);
     let aiPlan = {};
     if (trip.ai_suggestions) {
       try {
@@ -129,35 +143,39 @@ const Index = () => {
   };
 
   const handleActionClick = async (action: string) => {
+    console.log('Action clicked:', action);
     setIsAIAssistantOpen(true);
     
-    try {
-      toast({
-        title: "SAFAR AI Activated",
-        description: "Your AI travel assistant is ready to help plan your Indian adventure!"
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to activate AI assistant. Please try again.",
-        variant: "destructive"
-      });
-    }
+    toast({
+      title: "SAFAR AI Activated",
+      description: "Your AI travel assistant is ready to help plan your Indian adventure!"
+    });
   };
 
   return (
     <div className="min-h-screen">
       {/* Login/Logout Button */}
       <div className="fixed top-4 right-4 z-50">
-        {currentUser ? (
+        {isCheckingAuth ? (
+          <div className="bg-white rounded-lg shadow-lg p-3">
+            <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
+          </div>
+        ) : currentUser ? (
           <div className="flex items-center space-x-2 bg-white rounded-lg shadow-lg p-2">
-            <span className="text-sm font-medium px-2">{currentUser.full_name || currentUser.email}</span>
+            <span className="text-sm font-medium px-2">
+              {currentUser.full_name || currentUser.email}
+            </span>
             <Button 
               variant="outline" 
               size="sm"
               onClick={handleLogout}
+              disabled={isLoggingOut}
             >
-              <LogOut className="w-4 h-4 mr-1" />
+              {isLoggingOut ? (
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              ) : (
+                <LogOut className="w-4 h-4 mr-1" />
+              )}
               Logout
             </Button>
           </div>
