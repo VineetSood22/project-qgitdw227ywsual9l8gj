@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { EnhancedHeader } from '@/components/EnhancedHeader';
 import { Hero } from '@/components/Hero';
 import { DestinationGallery } from '@/components/DestinationGallery';
