@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { X, Loader2, CheckCircle2, MapPin, Calendar, Plane, Hotel, Utensils, Camera } from 'lucide-react';
+import { X, Loader2, CheckCircle2, MapPin, Calendar, Plane, Hotel, Utensils, Camera, WifiOff } from 'lucide-react';
 import { invokeLLM } from '@/integrations/core';
 import { Trip } from '@/entities';
+import { offlineStorage } from '@/lib/offline-storage';
 import { useToast } from '@/hooks/use-toast';
 
 interface TripGenerationModalProps {
@@ -26,6 +27,7 @@ export function TripGenerationModal({ isOpen, onClose, tripData, onComplete }: T
   const [currentStep, setCurrentStep] = useState(0);
   const [isGenerating, setIsGenerating] = useState(true);
   const [generatedPlan, setGeneratedPlan] = useState<any>(null);
+  const [isOffline, setIsOffline] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -46,6 +48,7 @@ export function TripGenerationModal({ isOpen, onClose, tripData, onComplete }: T
   const generateTrip = async () => {
     setIsGenerating(true);
     setCurrentStep(0);
+    setIsOffline(false);
 
     try {
       const placesText = tripData.additional_locations?.join(', ') || tripData.destination;
@@ -83,28 +86,26 @@ Make it detailed, practical, and exciting!`,
       }, 1500);
 
     } catch (error) {
-      console.log('AI generation failed, creating basic plan:', error);
+      console.log('AI generation or backend unavailable, using offline mode:', error);
+      setIsOffline(true);
       
       const basicPlan = generateBasicPlan(tripData);
       
-      try {
-        const savedTrip = await Trip.create({
-          ...tripData,
-          ai_suggestions: basicPlan
-        });
-        setGeneratedPlan(savedTrip);
-      } catch (dbError) {
-        console.log('Database save failed, using local data:', dbError);
-        setGeneratedPlan({
-          ...tripData,
-          id: Date.now().toString(),
-          ai_suggestions: basicPlan
-        });
-      }
+      const offlineTrip = offlineStorage.saveTrip({
+        ...tripData,
+        ai_suggestions: basicPlan
+      });
 
+      setGeneratedPlan(offlineTrip);
       setIsGenerating(false);
+
+      toast({
+        title: "Offline Mode Active",
+        description: "Trip saved locally. Will sync when connection is restored.",
+      });
+
       setTimeout(() => {
-        onComplete(generatedPlan || { ...tripData, ai_suggestions: basicPlan });
+        onComplete(offlineTrip);
       }, 1500);
     }
   };
@@ -128,15 +129,16 @@ Make it detailed, practical, and exciting!`,
       plan += `📅 Day ${i + 1}: ${place}\n\n`;
       plan += `Morning (9:00 AM - 12:00 PM):\n`;
       plan += `• Visit main attractions and landmarks\n`;
-      plan += `• Explore local markets\n\n`;
+      plan += `• Explore local markets\n`;
+      plan += `• Photography opportunities\n\n`;
       plan += `Afternoon (12:00 PM - 5:00 PM):\n`;
       plan += `• Lunch at local restaurant\n`;
       plan += `• Continue sightseeing\n`;
-      plan += `• Photography and shopping\n\n`;
+      plan += `• Shopping and cultural experiences\n\n`;
       plan += `Evening (5:00 PM - 9:00 PM):\n`;
       plan += `• Sunset viewing point\n`;
       plan += `• Dinner at recommended restaurant\n`;
-      plan += `• Local cultural experience\n\n`;
+      plan += `• Local cultural show or evening walk\n\n`;
       plan += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
     }
 
@@ -178,10 +180,18 @@ Make it detailed, practical, and exciting!`,
               </h2>
               <p className="text-gray-600">
                 {isGenerating 
-                  ? 'Our AI is crafting the perfect itinerary for you'
+                  ? isOffline 
+                    ? 'Creating your trip plan offline...'
+                    : 'Our AI is crafting the perfect itinerary for you'
                   : 'Your personalized trip plan is ready to explore'
                 }
               </p>
+              {isOffline && (
+                <div className="mt-3 flex items-center justify-center space-x-2 text-yellow-600">
+                  <WifiOff className="w-4 h-4" />
+                  <span className="text-sm">Working in offline mode</span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
