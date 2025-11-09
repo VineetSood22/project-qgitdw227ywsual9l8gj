@@ -1,219 +1,151 @@
-import { useState } from 'react';
-import { Star, ThumbsUp, MessageSquare, Plus, Send } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { offlineStorage } from '@/lib/offline-storage';
-import { useToast } from '@/hooks/use-toast';
+import { Star, ThumbsUp, MapPin, Calendar } from 'lucide-react';
 
 interface ReviewsTabProps {
   trip: any;
 }
 
 export function ReviewsTab({ trip }: ReviewsTabProps) {
-  const { toast } = useToast();
-  const [reviews, setReviews] = useState(offlineStorage.getReviewsForDestination(trip.destination));
-  const [isAddingReview, setIsAddingReview] = useState(false);
-  const [newReview, setNewReview] = useState({
-    rating: 5,
-    title: '',
-    review_text: '',
-  });
+  const destination = trip?.destination || 'India';
 
-  const handleSubmitReview = () => {
-    if (!newReview.title || !newReview.review_text) {
-      toast({
-        title: "Missing Information",
-        description: "Please provide a title and review text",
-        variant: "destructive",
-      });
-      return;
-    }
+  const reviews = [
+    {
+      name: 'Priya Sharma',
+      rating: 5,
+      date: '2 weeks ago',
+      title: 'Absolutely Amazing Experience!',
+      text: 'The trip was perfectly planned. Every detail was taken care of and we had the most wonderful time exploring the beautiful destinations. Highly recommend!',
+      helpful: 24,
+      verified: true,
+    },
+    {
+      name: 'Rahul Verma',
+      rating: 4,
+      date: '1 month ago',
+      title: 'Great Trip with Minor Issues',
+      text: 'Overall a fantastic experience. The itinerary was well-structured and we saw all the major attractions. Only minor hiccup was with hotel check-in timing.',
+      helpful: 18,
+      verified: true,
+    },
+    {
+      name: 'Anjali Patel',
+      rating: 5,
+      date: '1 month ago',
+      title: 'Perfect Family Vacation',
+      text: 'Traveled with my family and everyone had a blast! The activities were suitable for all ages and the local guides were very knowledgeable and friendly.',
+      helpful: 31,
+      verified: true,
+    },
+    {
+      name: 'Vikram Singh',
+      rating: 5,
+      date: '2 months ago',
+      title: 'Unforgettable Journey',
+      text: 'This was my first time visiting and it exceeded all expectations. The culture, food, and people were incredible. Already planning my next trip!',
+      helpful: 15,
+      verified: false,
+    },
+  ];
 
-    const review = offlineStorage.saveReview({
-      trip_id: trip.id,
-      destination: trip.destination,
-      rating: newReview.rating,
-      title: newReview.title,
-      review_text: newReview.review_text,
-      travel_date: new Date().toISOString().split('T')[0],
-      helpful_count: 0,
-    });
-
-    setReviews([review, ...reviews]);
-    setNewReview({ rating: 5, title: '', review_text: '' });
-    setIsAddingReview(false);
-
-    toast({
-      title: "Review Added!",
-      description: "Thank you for sharing your experience",
-    });
-  };
-
-  const renderStars = (rating: number, interactive = false, onChange?: (rating: number) => void) => {
-    return (
-      <div className="flex items-center space-x-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            className={`w-5 h-5 ${
-              star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-            } ${interactive ? 'cursor-pointer hover:scale-110 transition-transform' : ''}`}
-            onClick={() => interactive && onChange && onChange(star)}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  const averageRating = reviews.length > 0
-    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
-    : '0.0';
-
-  const ratingDistribution = [5, 4, 3, 2, 1].map(rating => ({
-    rating,
-    count: reviews.filter(r => r.rating === rating).length,
-    percentage: reviews.length > 0 ? (reviews.filter(r => r.rating === rating).length / reviews.length) * 100 : 0,
-  }));
+  const averageRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+  const ratingDistribution = [
+    { stars: 5, count: 156, percentage: 78 },
+    { stars: 4, count: 32, percentage: 16 },
+    { stars: 3, count: 8, percentage: 4 },
+    { stars: 2, count: 3, percentage: 1.5 },
+    { stars: 1, count: 1, percentage: 0.5 },
+  ];
 
   return (
     <div className="space-y-6">
-      <Card className="bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center space-x-3 mb-2">
-                <div className="text-5xl font-bold text-gray-900">{averageRating}</div>
-                {renderStars(Math.round(parseFloat(averageRating)))}
-              </div>
-              <p className="text-gray-600">Based on {reviews.length} review{reviews.length !== 1 ? 's' : ''}</p>
+      <div>
+        <h3 className="text-2xl font-bold mb-2">Traveler Reviews</h3>
+        <p className="text-gray-600">See what others say about {destination}</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100">
+          <div className="text-center">
+            <p className="text-5xl font-bold text-orange-600 mb-2">{averageRating.toFixed(1)}</p>
+            <div className="flex items-center justify-center gap-1 mb-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={`w-5 h-5 ${star <= averageRating ? 'fill-orange-500 text-orange-500' : 'text-gray-300'}`}
+                />
+              ))}
             </div>
-            <Button onClick={() => setIsAddingReview(true)} className="bg-orange-500 hover:bg-orange-600">
-              <Plus className="w-4 h-4 mr-2" />
-              Write Review
-            </Button>
+            <p className="text-sm text-gray-600">Based on {reviews.length} reviews</p>
           </div>
-        </CardContent>
-      </Card>
-
-      {isAddingReview && (
-        <Card className="border-2 border-orange-500">
-          <CardHeader>
-            <CardTitle>Share Your Experience</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label>Your Rating</Label>
-              <div className="mt-2">
-                {renderStars(newReview.rating, true, (rating) => setNewReview({ ...newReview, rating }))}
-              </div>
-            </div>
-
-            <div>
-              <Label>Review Title</Label>
-              <Input
-                placeholder="Summarize your experience..."
-                value={newReview.title}
-                onChange={(e) => setNewReview({ ...newReview, title: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <Label>Your Review</Label>
-              <Textarea
-                placeholder="Tell us about your trip, what you loved, and any tips for future travelers..."
-                value={newReview.review_text}
-                onChange={(e) => setNewReview({ ...newReview, review_text: e.target.value })}
-                rows={5}
-              />
-            </div>
-
-            <div className="flex space-x-2">
-              <Button onClick={handleSubmitReview} className="bg-orange-500 hover:bg-orange-600">
-                <Send className="w-4 h-4 mr-2" />
-                Submit Review
-              </Button>
-              <Button variant="outline" onClick={() => setIsAddingReview(false)}>
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
         </Card>
-      )}
 
-      <div className="space-y-3">
-        <h3 className="text-xl font-bold">Rating Distribution</h3>
-        {ratingDistribution.map(({ rating, count, percentage }) => (
-          <div key={rating} className="flex items-center space-x-3">
-            <div className="flex items-center space-x-1 w-20">
-              <span className="font-medium">{rating}</span>
-              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-            </div>
-            <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-yellow-400 transition-all"
-                style={{ width: `${percentage}%` }}
-              />
-            </div>
-            <span className="text-sm text-gray-600 w-12 text-right">{count}</span>
+        <Card className="p-6 md:col-span-2">
+          <h4 className="font-semibold mb-4">Rating Distribution</h4>
+          <div className="space-y-3">
+            {ratingDistribution.map((dist) => (
+              <div key={dist.stars} className="flex items-center gap-3">
+                <div className="flex items-center gap-1 w-16">
+                  <span className="text-sm font-medium">{dist.stars}</span>
+                  <Star className="w-4 h-4 fill-orange-500 text-orange-500" />
+                </div>
+                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-orange-500 h-2 rounded-full"
+                    style={{ width: `${dist.percentage}%` }}
+                  />
+                </div>
+                <span className="text-sm text-gray-600 w-12 text-right">{dist.count}</span>
+              </div>
+            ))}
           </div>
-        ))}
+        </Card>
       </div>
 
       <div className="space-y-4">
-        <h3 className="text-xl font-bold">Traveler Reviews</h3>
-        {reviews.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6 text-center py-12">
-              <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h4 className="text-lg font-semibold text-gray-700 mb-2">No Reviews Yet</h4>
-              <p className="text-gray-500 mb-4">Be the first to share your experience!</p>
-              <Button onClick={() => setIsAddingReview(true)} className="bg-orange-500 hover:bg-orange-600">
-                Write First Review
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          reviews.map((review) => (
-            <Card key={review.id}>
-              <CardContent className="pt-6">
-                <div className="flex items-start space-x-4">
-                  <Avatar className="w-12 h-12">
-                    <AvatarFallback className="bg-orange-500 text-white">
-                      {review.created_by?.charAt(0).toUpperCase() || 'T'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <h4 className="font-semibold">{review.title}</h4>
-                        <p className="text-sm text-gray-500">
-                          Traveled on {new Date(review.travel_date).toLocaleDateString('en-IN', { 
-                            month: 'long', 
-                            year: 'numeric' 
-                          })}
-                        </p>
-                      </div>
-                      {renderStars(review.rating)}
-                    </div>
-                    <p className="text-gray-700 mb-3">{review.review_text}</p>
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      <button className="flex items-center space-x-1 hover:text-orange-500 transition-colors">
-                        <ThumbsUp className="w-4 h-4" />
-                        <span>Helpful ({review.helpful_count || 0})</span>
-                      </button>
-                      <Badge variant="outline">{review.destination}</Badge>
-                    </div>
+        {reviews.map((review, idx) => (
+          <Card key={idx} className="p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold">
+                  {review.name.charAt(0)}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold">{review.name}</p>
+                    {review.verified && (
+                      <Badge variant="secondary" className="text-xs">
+                        Verified
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Calendar className="w-3 h-3" />
+                    <span>{review.date}</span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
+              </div>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`w-4 h-4 ${star <= review.rating ? 'fill-orange-500 text-orange-500' : 'text-gray-300'}`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <h4 className="font-semibold mb-2">{review.title}</h4>
+            <p className="text-gray-700 mb-4">{review.text}</p>
+
+            <div className="flex items-center gap-4 pt-4 border-t">
+              <button className="flex items-center gap-2 text-sm text-gray-600 hover:text-orange-600 transition-colors">
+                <ThumbsUp className="w-4 h-4" />
+                <span>Helpful ({review.helpful})</span>
+              </button>
+            </div>
+          </Card>
+        ))}
       </div>
     </div>
   );
