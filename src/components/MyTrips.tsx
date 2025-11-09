@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Calendar, Users, Trash2, Eye, Loader2, AlertCircle } from 'lucide-react';
+import { MapPin, Calendar, Users, Trash2, Eye, Loader2, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface MyTripsProps {
@@ -15,7 +15,7 @@ interface MyTripsProps {
 export function MyTrips({ isOpen, onClose, onViewTrip }: MyTripsProps) {
   const [trips, setTrips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
   const { toast } = useToast();
 
   // Sample trips for demo/offline mode
@@ -61,30 +61,47 @@ export function MyTrips({ isOpen, onClose, onViewTrip }: MyTripsProps) {
   const loadTrips = async () => {
     try {
       setLoading(true);
-      setError(null);
+      setIsOffline(false);
 
-      // Try to load from database
-      try {
+      // Try to load from database with timeout
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 5000)
+      );
+
+      const loadPromise = (async () => {
         const { Trip } = await import('@/entities');
-        const result = await Trip.list('-created_at', 50);
+        return await Trip.list('-created_at', 50);
+      })();
+
+      try {
+        const result = await Promise.race([loadPromise, timeoutPromise]) as any[];
         
         if (result && result.length > 0) {
+          console.log('Loaded trips from database:', result.length);
           setTrips(result);
+          setIsOffline(false);
         } else {
           // No trips in database, show samples
+          console.log('No trips found, showing samples');
           setTrips(sampleTrips);
-          setError('No saved trips yet. Here are some examples to get started!');
+          setIsOffline(false);
         }
-      } catch (dbError) {
-        console.error('Database error:', dbError);
-        // Fallback to sample trips
+      } catch (networkError) {
+        // Network error - use offline mode
+        console.log('Network error, switching to offline mode:', networkError);
         setTrips(sampleTrips);
-        setError('Working in offline mode. Your trips will be saved when connection is restored.');
+        setIsOffline(true);
+        
+        toast({
+          title: 'Working Offline',
+          description: 'Showing sample trips. Your saved trips will appear when connection is restored.',
+          variant: 'default',
+        });
       }
     } catch (err) {
       console.error('Error loading trips:', err);
       setTrips(sampleTrips);
-      setError('Working in offline mode. Showing sample trips.');
+      setIsOffline(true);
     } finally {
       setLoading(false);
     }
@@ -95,6 +112,15 @@ export function MyTrips({ isOpen, onClose, onViewTrip }: MyTripsProps) {
       toast({
         title: 'Demo Mode',
         description: 'Sample trips cannot be deleted. Create your own trips to manage them!',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (isOffline) {
+      toast({
+        title: 'Offline Mode',
+        description: 'Cannot delete trips while offline. Please check your connection.',
         variant: 'destructive',
       });
       return;
@@ -135,7 +161,15 @@ export function MyTrips({ isOpen, onClose, onViewTrip }: MyTripsProps) {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">My Trips</DialogTitle>
+          <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+            My Trips
+            {isOffline && (
+              <Badge variant="outline" className="text-xs font-normal">
+                <WifiOff className="w-3 h-3 mr-1" />
+                Offline
+              </Badge>
+            )}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="overflow-auto max-h-[calc(80vh-100px)]">
@@ -146,10 +180,15 @@ export function MyTrips({ isOpen, onClose, onViewTrip }: MyTripsProps) {
             </div>
           ) : (
             <>
-              {error && (
-                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-blue-800">{error}</p>
+              {isOffline && (
+                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-900 mb-1">Working in Offline Mode</p>
+                    <p className="text-sm text-amber-800">
+                      Showing sample trips. Your saved trips will appear when your connection is restored.
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -207,6 +246,7 @@ export function MyTrips({ isOpen, onClose, onViewTrip }: MyTripsProps) {
                           variant="outline"
                           size="icon"
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          disabled={isOffline}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
