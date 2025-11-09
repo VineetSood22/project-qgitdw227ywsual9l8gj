@@ -20,18 +20,21 @@ export default function Index() {
   const [generatedTrip, setGeneratedTrip] = useState<any>(null);
 
   const handleTripCreated = (tripData: any) => {
+    console.log('Trip created:', tripData);
     setCurrentTripData(tripData);
     setIsTripModalOpen(false);
     setIsGenerationModalOpen(true);
   };
 
   const handleGenerationComplete = (trip: any) => {
+    console.log('Trip generation complete:', trip);
     setGeneratedTrip(trip);
     setIsGenerationModalOpen(false);
     setIsTripDetailsOpen(true);
   };
 
   const handleViewTrip = (trip: any) => {
+    console.log('Viewing trip:', trip);
     setGeneratedTrip(trip);
     setIsMyTripsOpen(false);
     setIsTripDetailsOpen(true);

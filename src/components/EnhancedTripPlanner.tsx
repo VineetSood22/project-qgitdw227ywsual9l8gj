@@ -2,10 +2,8 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Send, MapPin, Calendar, Users, Loader2 } from 'lucide-react';
-import { invokeLLM } from '@/integrations/core';
+import { Sparkles, Send, Loader2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface EnhancedTripPlannerProps {
@@ -27,6 +25,7 @@ export function EnhancedTripPlanner({ isOpen, onClose }: EnhancedTripPlannerProp
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [connectionError, setConnectionError] = useState(false);
   const { toast } = useToast();
 
   const quickQuestions = [
@@ -36,6 +35,29 @@ export function EnhancedTripPlanner({ isOpen, onClose }: EnhancedTripPlannerProp
     'Best time to visit Goa',
   ];
 
+  // Fallback responses for common questions
+  const getFallbackResponse = (question: string): string => {
+    const lowerQuestion = question.toLowerCase();
+    
+    if (lowerQuestion.includes('rajasthan')) {
+      return 'Rajasthan is a magnificent destination! Top places include:\n\n• Jaipur - The Pink City with Amber Fort and City Palace\n• Udaipur - City of Lakes with stunning palaces\n• Jaisalmer - Golden city with desert safaris\n• Jodhpur - The Blue City with Mehrangarh Fort\n\nBest time: October to March\nDuration: 7-10 days recommended\nBudget: ₹40,000-80,000 per person';
+    }
+    
+    if (lowerQuestion.includes('kerala')) {
+      return 'Kerala is perfect for a relaxing getaway! 5-day itinerary:\n\nDay 1-2: Munnar (tea plantations, hill stations)\nDay 3: Thekkady (wildlife sanctuary)\nDay 4-5: Alleppey (backwater houseboat stay)\n\nBest time: September to March\nBudget: ₹30,000-50,000 per person\nDon\'t miss: Kerala cuisine, Ayurvedic massage';
+    }
+    
+    if (lowerQuestion.includes('budget') || lowerQuestion.includes('cheap')) {
+      return 'Budget-friendly destinations in India:\n\n• Rishikesh - Yoga, rafting (₹15,000-25,000)\n• Gokarna - Beaches, temples (₹20,000-30,000)\n• Mcleodganj - Mountains, culture (₹18,000-28,000)\n• Hampi - Historical ruins (₹20,000-35,000)\n• Pondicherry - French charm (₹25,000-40,000)\n\nTips: Travel off-season, use public transport, stay in hostels';
+    }
+    
+    if (lowerQuestion.includes('goa')) {
+      return 'Goa is India\'s beach paradise!\n\nBest time: November to February (pleasant weather)\nAvoid: June to September (monsoon)\n\nNorth Goa: Parties, nightlife, water sports\nSouth Goa: Peaceful beaches, luxury resorts\n\nDuration: 4-7 days\nBudget: ₹25,000-60,000 per person\nMust-try: Seafood, beach shacks, sunset cruises';
+    }
+    
+    return 'I\'d love to help you with that! India offers incredible diversity - from the Himalayas in the north to beaches in the south, from deserts in Rajasthan to backwaters in Kerala.\n\nCould you tell me more about:\n• Your preferred type of destination (beach, mountains, heritage, adventure)?\n• Duration of your trip?\n• Budget range?\n• Time of year you\'re planning to travel?\n\nThis will help me give you personalized recommendations!';
+  };
+
   const handleSend = async (question?: string) => {
     const userMessage = question || input.trim();
     if (!userMessage) return;
@@ -43,8 +65,12 @@ export function EnhancedTripPlanner({ isOpen, onClose }: EnhancedTripPlannerProp
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
     setInput('');
     setLoading(true);
+    setConnectionError(false);
 
     try {
+      // Try to use AI
+      const { invokeLLM } = await import('@/integrations/core');
+      
       const response = await invokeLLM({
         prompt: `You are SAFAR AI, a helpful travel assistant specializing in Indian destinations. 
         
@@ -60,18 +86,15 @@ Provide a helpful, friendly, and detailed response about Indian travel. Include 
       ]);
     } catch (err) {
       console.error('Error getting AI response:', err);
-      toast({
-        title: 'Connection Error',
-        description: 'Unable to get response. Please check your connection and try again.',
-        variant: 'destructive',
-      });
+      setConnectionError(true);
       
-      // Fallback response
+      // Use fallback response
+      const fallbackResponse = getFallbackResponse(userMessage);
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: 'I apologize, but I\'m having trouble connecting right now. Here are some general tips: India offers diverse destinations from beaches in Goa to mountains in Himachal Pradesh. The best time to visit most places is October to March. Would you like specific recommendations for any region?',
+          content: fallbackResponse,
         },
       ]);
     } finally {
@@ -95,6 +118,16 @@ Provide a helpful, friendly, and detailed response about Indian travel. Include 
         </DialogHeader>
 
         <div className="flex flex-col h-[calc(80vh-140px)]">
+          {/* Connection Warning */}
+          {connectionError && (
+            <div className="mx-6 mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-yellow-800">
+                Working in offline mode. Responses are based on general knowledge.
+              </p>
+            </div>
+          )}
+
           {/* Messages */}
           <div className="flex-1 overflow-auto p-6 space-y-4">
             {messages.map((message, idx) => (
