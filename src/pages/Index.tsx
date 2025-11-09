@@ -1,107 +1,114 @@
 import { useState } from 'react';
-import { EnhancedHeader } from '@/components/EnhancedHeader';
+import { Button } from '@/components/ui/button';
+import { Sparkles, Map, BookOpen } from 'lucide-react';
+import { Header } from '@/components/Header';
 import { Hero } from '@/components/Hero';
-import { DestinationGallery } from '@/components/DestinationGallery';
-import { PackagesGallery } from '@/components/PackagesGallery';
+import { Footer } from '@/components/Footer';
 import { TripModal } from '@/components/TripModal';
 import { TripGenerationModal } from '@/components/TripGenerationModal';
 import { EnhancedTripDetails } from '@/components/EnhancedTripDetails';
 import { MyTrips } from '@/components/MyTrips';
 import { EnhancedTripPlanner } from '@/components/EnhancedTripPlanner';
-import { Footer } from '@/components/Footer';
-import { useToast } from '@/hooks/use-toast';
 
-const Index = () => {
+export default function Index() {
   const [isTripModalOpen, setIsTripModalOpen] = useState(false);
-  const [isTripGenerationOpen, setIsTripGenerationOpen] = useState(false);
+  const [isGenerationModalOpen, setIsGenerationModalOpen] = useState(false);
   const [isTripDetailsOpen, setIsTripDetailsOpen] = useState(false);
   const [isMyTripsOpen, setIsMyTripsOpen] = useState(false);
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
-  const [currentTrip, setCurrentTrip] = useState(null);
-  const [generatingTrip, setGeneratingTrip] = useState(null);
-  const { toast } = useToast();
-
-  const handlePlanTrip = () => {
-    setIsTripModalOpen(true);
-  };
-
-  const handleSelectPackage = (pkg: any) => {
-    toast({
-      title: "Package Selected",
-      description: `Creating trip based on ${pkg.name}`,
-    });
-    setIsTripModalOpen(true);
-  };
+  const [currentTripData, setCurrentTripData] = useState<any>(null);
+  const [generatedTrip, setGeneratedTrip] = useState<any>(null);
 
   const handleTripCreated = (tripData: any) => {
-    console.log('Trip created:', tripData);
-    setGeneratingTrip(tripData);
-    setIsTripGenerationOpen(true);
+    setCurrentTripData(tripData);
     setIsTripModalOpen(false);
+    setIsGenerationModalOpen(true);
   };
 
-  const handleGenerationComplete = (generatedTrip: any) => {
-    console.log('Trip generation complete:', generatedTrip);
-    setCurrentTrip(generatedTrip);
-    setIsTripGenerationOpen(false);
+  const handleGenerationComplete = (trip: any) => {
+    setGeneratedTrip(trip);
+    setIsGenerationModalOpen(false);
     setIsTripDetailsOpen(true);
   };
 
   const handleViewTrip = (trip: any) => {
-    console.log('Viewing trip:', trip);
-    let aiPlan = {};
-    if (trip.ai_suggestions) {
-      try {
-        aiPlan = JSON.parse(trip.ai_suggestions);
-      } catch (error) {
-        console.error('Failed to parse AI suggestions:', error);
-      }
-    }
-    
-    setCurrentTrip({ ...trip, ai_plan: aiPlan });
+    setGeneratedTrip(trip);
     setIsMyTripsOpen(false);
     setIsTripDetailsOpen(true);
   };
 
-  const handleActionClick = async (action: string) => {
-    console.log('Action clicked:', action);
-    setIsAIAssistantOpen(true);
-    
-    toast({
-      title: "SAFAR AI Activated",
-      description: "Your AI travel assistant is ready to help plan your Indian adventure!"
-    });
-  };
-
   return (
-    <div className="min-h-screen">
-      <EnhancedHeader 
-        onPlanTrip={handlePlanTrip}
-        onMyTrips={() => setIsMyTripsOpen(true)}
-        onAIAssistant={() => setIsAIAssistantOpen(true)}
-      />
-      <Hero onActionClick={handleActionClick} />
-      <PackagesGallery onSelectPackage={handleSelectPackage} />
-      <DestinationGallery />
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
+      <Header />
+      <Hero />
+
+      <div className="container mx-auto px-4 py-16">
+        <div className="text-center mb-12">
+          <h2 className="text-4xl font-bold mb-4">Start Your Journey</h2>
+          <p className="text-gray-600 text-lg">Choose how you want to plan your perfect trip</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div
+            onClick={() => setIsTripModalOpen(true)}
+            className="p-8 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all cursor-pointer border-2 border-transparent hover:border-orange-500"
+          >
+            <div className="w-16 h-16 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Map className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-center mb-2">Dream Your Trip</h3>
+            <p className="text-gray-600 text-center text-sm">
+              Select your state and choose from famous places to create your perfect itinerary
+            </p>
+          </div>
+
+          <div
+            onClick={() => setIsMyTripsOpen(true)}
+            className="p-8 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all cursor-pointer border-2 border-transparent hover:border-orange-500"
+          >
+            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <BookOpen className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-center mb-2">My Trips</h3>
+            <p className="text-gray-600 text-center text-sm">
+              View and manage all your saved trips in one place
+            </p>
+          </div>
+
+          <div
+            onClick={() => setIsAIAssistantOpen(true)}
+            className="p-8 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all cursor-pointer border-2 border-transparent hover:border-orange-500"
+          >
+            <div className="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-center mb-2">AI Assistant</h3>
+            <p className="text-gray-600 text-center text-sm">
+              Chat with SAFAR AI for personalized travel recommendations
+            </p>
+          </div>
+        </div>
+      </div>
+
       <Footer />
-      
-      <TripModal 
-        isOpen={isTripModalOpen} 
+
+      <TripModal
+        isOpen={isTripModalOpen}
         onClose={() => setIsTripModalOpen(false)}
         onTripCreated={handleTripCreated}
       />
 
       <TripGenerationModal
-        isOpen={isTripGenerationOpen}
-        onClose={() => setIsTripGenerationOpen(false)}
-        tripData={generatingTrip}
+        isOpen={isGenerationModalOpen}
+        onClose={() => setIsGenerationModalOpen(false)}
+        tripData={currentTripData}
         onComplete={handleGenerationComplete}
       />
 
       <EnhancedTripDetails
         isOpen={isTripDetailsOpen}
         onClose={() => setIsTripDetailsOpen(false)}
-        tripData={currentTrip}
+        trip={generatedTrip}
       />
 
       <MyTrips
@@ -110,12 +117,10 @@ const Index = () => {
         onViewTrip={handleViewTrip}
       />
 
-      <EnhancedTripPlanner 
-        isOpen={isAIAssistantOpen} 
-        onClose={() => setIsAIAssistantOpen(false)} 
+      <EnhancedTripPlanner
+        isOpen={isAIAssistantOpen}
+        onClose={() => setIsAIAssistantOpen(false)}
       />
     </div>
   );
-};
-
-export default Index;
+}

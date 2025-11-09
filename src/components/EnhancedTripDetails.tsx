@@ -3,454 +3,67 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { X, Calendar, MapPin, Users, Thermometer, Backpack, Plane, Train, Bus, Car, Hotel, Home, Building, Tent, Star, Clock, TrendingUp, TrendingDown, Minus, ExternalLink, Navigation, Calculator, Save, Heart, Edit2, Utensils, Camera, MessageSquare, ThumbsUp, Cloud, Sun, CloudRain } from 'lucide-react';
-import { invokeLLM } from '@/integrations/core';
+import { X, MapPin, Calendar, Users, DollarSign, Hotel, Utensils, Map, Star, Save, ExternalLink } from 'lucide-react';
+import { Trip } from '@/entities';
+import { stateCuisine } from '@/lib/india-places-data';
 import { useToast } from '@/hooks/use-toast';
-import { Trip, Review } from '@/entities';
 
 interface EnhancedTripDetailsProps {
   isOpen: boolean;
   onClose: () => void;
-  tripData: any;
+  trip: any;
 }
 
-export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripDetailsProps) {
+export function EnhancedTripDetails({ isOpen, onClose, trip }: EnhancedTripDetailsProps) {
   const [activeTab, setActiveTab] = useState('itinerary');
-  const [accommodations, setAccommodations] = useState<any[]>([]);
-  const [weatherData, setWeatherData] = useState<any>(null);
-  const [distanceInfo, setDistanceInfo] = useState<any>(null);
-  const [fromLocation, setFromLocation] = useState(tripData?.from_location || '');
-  const [isLoadingStays, setIsLoadingStays] = useState(false);
-  const [isLoadingWeather, setIsLoadingWeather] = useState(false);
-  const [isLoadingDistance, setIsLoadingDistance] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedTrip, setEditedTrip] = useState(tripData);
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [newReview, setNewReview] = useState({ rating: 5, title: '', review_text: '' });
-  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (isOpen && tripData) {
-      setEditedTrip(tripData);
-      setFromLocation(tripData.from_location || '');
-      loadAccommodations();
-      loadWeatherData();
-      loadReviews();
-      if (tripData.from_location) {
-        loadDistanceInfo();
-      }
-    }
-  }, [isOpen, tripData]);
-
-  const generateFallbackAccommodations = (destination: string, budget: string) => {
-    const budgetRanges = {
-      budget: { min: 1000, max: 2500 },
-      medium: { min: 2500, max: 5000 },
-      luxury: { min: 5000, max: 15000 }
-    };
-
-    const range = budgetRanges[budget as keyof typeof budgetRanges] || budgetRanges.medium;
-
-    return [
-      {
-        name: `${destination} Beach Resort`,
-        type: 'Resort',
-        price_range: `₹${range.min} - ₹${range.max}/night`,
-        rating: 4.5,
-        amenities: ['Pool', 'Restaurant', 'WiFi', 'Spa'],
-        location: `${destination} Beach Area`,
-        description: 'Beautiful beachfront property with modern amenities',
-        booking_tip: 'Book 2-3 weeks in advance for best rates'
-      },
-      {
-        name: `Heritage ${destination} Hotel`,
-        type: 'Hotel',
-        price_range: `₹${Math.floor(range.min * 0.8)} - ₹${Math.floor(range.max * 0.8)}/night`,
-        rating: 4.3,
-        amenities: ['Restaurant', 'WiFi', 'Parking', 'Room Service'],
-        location: `${destination} City Center`,
-        description: 'Centrally located hotel with traditional charm',
-        booking_tip: 'Great location for exploring the city'
-      },
-      {
-        name: `${destination} Homestay`,
-        type: 'Homestay',
-        price_range: `₹${Math.floor(range.min * 0.5)} - ₹${Math.floor(range.max * 0.5)}/night`,
-        rating: 4.7,
-        amenities: ['Home-cooked meals', 'WiFi', 'Local guide'],
-        location: `${destination} Residential Area`,
-        description: 'Authentic local experience with warm hospitality',
-        booking_tip: 'Perfect for experiencing local culture'
-      },
-      {
-        name: `Budget Inn ${destination}`,
-        type: 'Hostel',
-        price_range: `₹${Math.floor(range.min * 0.3)} - ₹${Math.floor(range.max * 0.3)}/night`,
-        rating: 4.0,
-        amenities: ['WiFi', 'Common Kitchen', 'Lounge'],
-        location: `${destination} Backpacker Area`,
-        description: 'Clean and affordable accommodation for travelers',
-        booking_tip: 'Great for solo travelers and backpackers'
-      }
-    ];
-  };
-
-  const generateFallbackWeather = (destination: string) => {
-    return {
-      current: {
-        temperature: '25°C',
-        condition: 'Partly Cloudy',
-        humidity: '65%',
-        wind: '12 km/h'
-      },
-      forecast: [
-        { day: 'Today', high: '28°C', low: '22°C', condition: 'Sunny', icon: 'sun' },
-        { day: 'Tomorrow', high: '27°C', low: '21°C', condition: 'Partly Cloudy', icon: 'cloud' },
-        { day: 'Day 3', high: '26°C', low: '20°C', condition: 'Cloudy', icon: 'cloud' },
-        { day: 'Day 4', high: '25°C', low: '19°C', condition: 'Light Rain', icon: 'rain' },
-        { day: 'Day 5', high: '27°C', low: '21°C', condition: 'Sunny', icon: 'sun' }
-      ],
-      best_time: 'October to March is ideal for visiting',
-      packing_tips: [
-        'Light cotton clothes for daytime',
-        'Light jacket for evenings',
-        'Sunscreen and sunglasses',
-        'Comfortable walking shoes',
-        'Rain jacket (just in case)'
-      ]
-    };
-  };
-
-  const generateFallbackDistance = (from: string, to: string) => {
-    return {
-      routes: [
-        {
-          mode: 'Flight',
-          distance: '~1,200 km',
-          duration: '2-3 hours',
-          cost_estimate: '₹3,000 - ₹8,000',
-          route_description: 'Direct flights available from major airports'
-        },
-        {
-          mode: 'Train',
-          distance: '~1,200 km',
-          duration: '18-24 hours',
-          cost_estimate: '₹800 - ₹3,000',
-          route_description: 'Multiple train options including express trains'
-        },
-        {
-          mode: 'Bus',
-          distance: '~1,200 km',
-          duration: '20-26 hours',
-          cost_estimate: '₹600 - ₹2,000',
-          route_description: 'Sleeper and semi-sleeper buses available'
-        },
-        {
-          mode: 'Car',
-          distance: '~1,200 km',
-          duration: '16-20 hours',
-          cost_estimate: '₹8,000 - ₹15,000',
-          route_description: 'Self-drive or hire a driver'
-        }
-      ],
-      major_stops: ['City A', 'City B', 'City C'],
-      map_overview: `Route from ${from} to ${to} via major highways`,
-      travel_tips: [
-        'Book tickets in advance for better prices',
-        'Check weather conditions before traveling',
-        'Keep emergency contacts handy',
-        'Carry valid ID proof'
-      ]
-    };
-  };
-
-  const loadAccommodations = async () => {
-    setIsLoadingStays(true);
-    try {
-      const response = await invokeLLM({
-        prompt: `Find 4 accommodation options in ${tripData.destination} for ${tripData.travelers} travelers with ${tripData.budget} budget. Include hotels, resorts, homestays, and hostels. For each: name, type, price range per night, rating, amenities, location, description, booking tip.`,
-        add_context_from_internet: true,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            accommodations: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  name: { type: "string" },
-                  type: { type: "string" },
-                  price_range: { type: "string" },
-                  rating: { type: "number" },
-                  amenities: { type: "array", items: { type: "string" } },
-                  location: { type: "string" },
-                  description: { type: "string" },
-                  booking_tip: { type: "string" }
-                }
-              }
-            }
-          }
-        }
-      });
-      
-      setAccommodations(response.accommodations || []);
-    } catch (error) {
-      console.log('AI unavailable, using smart accommodation suggestions:', error);
-      setAccommodations(generateFallbackAccommodations(tripData.destination, tripData.budget));
-    } finally {
-      setIsLoadingStays(false);
-    }
-  };
-
-  const loadWeatherData = async () => {
-    setIsLoadingWeather(true);
-    try {
-      const response = await invokeLLM({
-        prompt: `Provide weather information for ${tripData.destination}: current conditions, 5-day forecast, best time to visit, and packing tips.`,
-        add_context_from_internet: true,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            current: {
-              type: "object",
-              properties: {
-                temperature: { type: "string" },
-                condition: { type: "string" },
-                humidity: { type: "string" },
-                wind: { type: "string" }
-              }
-            },
-            forecast: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  day: { type: "string" },
-                  high: { type: "string" },
-                  low: { type: "string" },
-                  condition: { type: "string" }
-                }
-              }
-            },
-            best_time: { type: "string" },
-            packing_tips: { type: "array", items: { type: "string" } }
-          }
-        }
-      });
-      
-      setWeatherData(response);
-    } catch (error) {
-      console.log('Weather data unavailable, using seasonal information:', error);
-      setWeatherData(generateFallbackWeather(tripData.destination));
-    } finally {
-      setIsLoadingWeather(false);
-    }
-  };
-
-  const loadDistanceInfo = async () => {
-    if (!fromLocation) return;
-
-    setIsLoadingDistance(true);
-    try {
-      const response = await invokeLLM({
-        prompt: `Calculate travel from ${fromLocation} to ${tripData.destination}. Include distance, time, and cost for flight, train, bus, and car. Add major stops and travel tips.`,
-        add_context_from_internet: true,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            routes: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  mode: { type: "string" },
-                  distance: { type: "string" },
-                  duration: { type: "string" },
-                  cost_estimate: { type: "string" },
-                  route_description: { type: "string" }
-                }
-              }
-            },
-            major_stops: { type: "array", items: { type: "string" } },
-            map_overview: { type: "string" },
-            travel_tips: { type: "array", items: { type: "string" } }
-          }
-        }
-      });
-      
-      setDistanceInfo(response);
-    } catch (error) {
-      console.log('Distance info unavailable, using estimates:', error);
-      setDistanceInfo(generateFallbackDistance(fromLocation, tripData.destination));
-    } finally {
-      setIsLoadingDistance(false);
-    }
-  };
-
-  const loadReviews = async () => {
-    try {
-      const tripReviews = await Review.filter({ trip_id: tripData.id }, '-created_at', 50);
-      setReviews(tripReviews);
-    } catch (error) {
-      console.log('Reviews unavailable:', error);
-      setReviews([]);
-    }
-  };
-
-  const submitReview = async () => {
-    if (!newReview.title || !newReview.review_text) {
-      toast({
-        title: "Missing Information",
-        description: "Please provide a title and review text.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsSubmittingReview(true);
-    try {
-      await Review.create({
-        trip_id: tripData.id,
-        destination: tripData.destination,
-        rating: newReview.rating,
-        title: newReview.title,
-        review_text: newReview.review_text,
-        travel_date: new Date().toISOString(),
-        helpful_count: 0,
-        photos: []
-      });
-
-      toast({
-        title: "Review Submitted!",
-        description: "Thank you for sharing your experience."
-      });
-
-      setNewReview({ rating: 5, title: '', review_text: '' });
-      loadReviews();
-    } catch (error) {
-      console.log('Could not save review:', error);
-      toast({
-        title: "Review Saved Locally",
-        description: "Your review has been saved to this device.",
-        variant: "default"
-      });
-    } finally {
-      setIsSubmittingReview(false);
-    }
-  };
-
   const saveTrip = async () => {
-    setIsSaving(true);
     try {
-      await Trip.update(tripData.id, {
-        name: editedTrip.name,
-        status: 'saved'
-      });
-      
-      toast({
-        title: "Trip Saved!",
-        description: "Your trip has been saved successfully."
-      });
-      setIsEditing(false);
+      if (trip.id) {
+        await Trip.update(trip.id, { status: 'saved' });
+        toast({
+          title: "Trip Saved!",
+          description: "Your trip has been saved to My Trips"
+        });
+      }
     } catch (error) {
-      console.log('Could not save to database:', error);
+      console.log('Could not save trip:', error);
       toast({
         title: "Trip Saved Locally",
-        description: "Your changes are saved on this device.",
+        description: "Your trip is saved in this session",
         variant: "default"
       });
-      setIsEditing(false);
-    } finally {
-      setIsSaving(false);
     }
   };
 
-  const getTransportIcon = (mode: string) => {
-    switch (mode?.toLowerCase()) {
-      case 'flight': return <Plane className="w-4 h-4" />;
-      case 'train': return <Train className="w-4 h-4" />;
-      case 'bus': return <Bus className="w-4 h-4" />;
-      case 'car': return <Car className="w-4 h-4" />;
-      default: return <MapPin className="w-4 h-4" />;
-    }
-  };
+  const cuisineList = stateCuisine[trip.destination] || [
+    'Local Street Food',
+    'Regional Thali',
+    'Traditional Sweets',
+    'Local Beverages',
+    'Specialty Dishes'
+  ];
 
-  const getAccommodationIcon = (type: string) => {
-    switch (type?.toLowerCase()) {
-      case 'hotel': return <Hotel className="w-4 h-4" />;
-      case 'resort': return <Building className="w-4 h-4" />;
-      case 'homestay': return <Home className="w-4 h-4" />;
-      case 'hostel': return <Tent className="w-4 h-4" />;
-      default: return <Hotel className="w-4 h-4" />;
-    }
-  };
+  const mustVisitPlaces = trip.additional_locations || [trip.destination];
 
-  const getWeatherIcon = (condition: string) => {
-    switch (condition?.toLowerCase()) {
-      case 'sun':
-      case 'sunny': return <Sun className="w-6 h-6 text-yellow-500" />;
-      case 'rain':
-      case 'rainy': return <CloudRain className="w-6 h-6 text-blue-500" />;
-      case 'cloud':
-      case 'cloudy': return <Cloud className="w-6 h-6 text-gray-500" />;
-      default: return <Cloud className="w-6 h-6 text-gray-400" />;
-    }
-  };
-
-  if (!isOpen || !tripData) return null;
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
       <div className="fixed inset-4 bg-white rounded-2xl shadow-2xl overflow-hidden">
         <div className="flex flex-col h-full">
-          {/* Header */}
           <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-orange-500 to-orange-600">
-            <div className="flex-1">
-              {isEditing ? (
-                <Input
-                  value={editedTrip.name}
-                  onChange={(e) => setEditedTrip({ ...editedTrip, name: e.target.value })}
-                  className="text-2xl font-bold text-white bg-white/20 border-white/30"
-                />
-              ) : (
-                <h2 className="text-2xl font-bold text-white">{tripData.name || `${tripData.destination} Trip`}</h2>
-              )}
-              <div className="flex items-center space-x-4 mt-2 text-white/90">
-                <div className="flex items-center space-x-1">
-                  <MapPin className="w-4 h-4" />
-                  <span>{tripData.destination}</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Calendar className="w-4 h-4" />
-                  <span>{tripData.duration}</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Users className="w-4 h-4" />
-                  <span>{tripData.travelers} travelers</span>
-                </div>
-              </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white">{trip.name || trip.destination}</h2>
+              <p className="text-orange-100 text-sm mt-1">
+                {trip.duration} • {trip.travelers} travelers • {trip.budget} budget
+              </p>
             </div>
-            <div className="flex items-center space-x-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setIsEditing(!isEditing)}
-                className="text-white hover:bg-white/20"
-              >
-                <Edit2 className="w-5 h-5" />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={saveTrip}
-                disabled={isSaving}
-                className="text-white hover:bg-white/20"
-              >
-                {isSaving ? <Heart className="w-5 h-5 animate-pulse" /> : <Save className="w-5 h-5" />}
+            <div className="flex space-x-2">
+              <Button variant="ghost" size="sm" onClick={saveTrip} className="text-white hover:bg-white/20">
+                <Save className="w-5 h-5 mr-1" />
+                Save Trip
               </Button>
               <Button variant="ghost" size="sm" onClick={onClose} className="text-white hover:bg-white/20">
                 <X className="w-5 h-5" />
@@ -458,363 +71,270 @@ export function EnhancedTripDetails({ isOpen, onClose, tripData }: EnhancedTripD
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="flex-1 overflow-hidden">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-              <TabsList className="grid w-full grid-cols-6 bg-gray-50">
-                <TabsTrigger value="itinerary">Itinerary</TabsTrigger>
-                <TabsTrigger value="stays">Stays</TabsTrigger>
-                <TabsTrigger value="weather">Weather</TabsTrigger>
-                <TabsTrigger value="distance">Distance</TabsTrigger>
-                <TabsTrigger value="budget">Budget</TabsTrigger>
-                <TabsTrigger value="reviews">Reviews</TabsTrigger>
+          <div className="flex-1 overflow-y-auto">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
+                <TabsTrigger value="itinerary" className="rounded-none border-b-2 data-[state=active]:border-orange-500">
+                  Itinerary
+                </TabsTrigger>
+                <TabsTrigger value="places" className="rounded-none border-b-2 data-[state=active]:border-orange-500">
+                  Must Visit Places
+                </TabsTrigger>
+                <TabsTrigger value="cuisine" className="rounded-none border-b-2 data-[state=active]:border-orange-500">
+                  Famous Cuisine
+                </TabsTrigger>
+                <TabsTrigger value="stays" className="rounded-none border-b-2 data-[state=active]:border-orange-500">
+                  Stays
+                </TabsTrigger>
+                <TabsTrigger value="budget" className="rounded-none border-b-2 data-[state=active]:border-orange-500">
+                  Budget
+                </TabsTrigger>
+                <TabsTrigger value="distance" className="rounded-none border-b-2 data-[state=active]:border-orange-500">
+                  Distance & Routes
+                </TabsTrigger>
               </TabsList>
 
-              <div className="flex-1 overflow-y-auto p-6">
-                {/* Itinerary Tab */}
-                <TabsContent value="itinerary" className="space-y-4 mt-0">
-                  <h3 className="text-xl font-semibold mb-4">Your Trip Plan</h3>
-                  {tripData.ai_suggestions ? (
-                    <Card>
-                      <CardContent className="pt-6">
-                        <div className="prose prose-sm max-w-none">
-                          <pre className="whitespace-pre-wrap font-sans text-sm">{tripData.ai_suggestions}</pre>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <p className="text-gray-500">No itinerary available yet.</p>
-                  )}
+              <div className="p-6">
+                <TabsContent value="itinerary" className="mt-0">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Day-by-Day Itinerary</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="prose max-w-none">
+                        <pre className="whitespace-pre-wrap font-sans text-sm">
+                          {trip.ai_suggestions || 'Loading itinerary...'}
+                        </pre>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </TabsContent>
 
-                {/* Stays Tab */}
-                <TabsContent value="stays" className="space-y-4 mt-0">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold">Accommodation Options</h3>
-                    <Badge variant="secondary">{tripData.budget} budget</Badge>
-                  </div>
-                  
-                  {isLoadingStays ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
-                      <p className="mt-2 text-gray-600">Finding best stays...</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {accommodations.map((stay, index) => (
-                        <Card key={index} className="hover:shadow-lg transition-shadow">
-                          <CardHeader>
-                            <CardTitle className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                {getAccommodationIcon(stay.type)}
-                                <span className="text-lg">{stay.name}</span>
-                              </div>
-                              <div className="flex items-center space-x-1">
-                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                                <span className="text-sm">{stay.rating}</span>
-                              </div>
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-3">
-                              <div className="flex items-center justify-between">
-                                <Badge variant="outline">{stay.type}</Badge>
-                                <span className="font-semibold text-orange-600">{stay.price_range}</span>
-                              </div>
-                              <p className="text-sm text-gray-600">{stay.description}</p>
-                              <div>
-                                <h4 className="font-medium text-sm mb-1">Amenities:</h4>
-                                <div className="flex flex-wrap gap-1">
-                                  {stay.amenities?.slice(0, 4).map((amenity: string, i: number) => (
-                                    <Badge key={i} variant="secondary" className="text-xs">{amenity}</Badge>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-between pt-2">
-                                <span className="text-xs text-gray-500">{stay.location}</span>
-                                <Button 
-                                  size="sm" 
-                                  className="bg-blue-600 hover:bg-blue-700"
-                                  onClick={() => window.open(`https://www.booking.com/search.html?ss=${encodeURIComponent(stay.name + ' ' + stay.location)}`, '_blank')}
-                                >
-                                  <ExternalLink className="w-3 h-3 mr-1" />
-                                  Book
-                                </Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* Weather Tab */}
-                <TabsContent value="weather" className="space-y-4 mt-0">
-                  <h3 className="text-xl font-semibold mb-4">Weather & Packing Guide</h3>
-                  
-                  {isLoadingWeather ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
-                      <p className="mt-2 text-gray-600">Loading weather data...</p>
-                    </div>
-                  ) : weatherData && (
-                    <div className="space-y-6">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center space-x-2">
-                            <Thermometer className="w-5 h-5 text-orange-500" />
-                            <span>Current Weather</span>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div>
-                              <p className="text-sm text-gray-500">Temperature</p>
-                              <p className="text-2xl font-bold">{weatherData.current?.temperature}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-gray-500">Condition</p>
-                              <p className="text-lg font-medium">{weatherData.current?.condition}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-gray-500">Humidity</p>
-                              <p className="text-lg font-medium">{weatherData.current?.humidity}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-gray-500">Wind</p>
-                              <p className="text-lg font-medium">{weatherData.current?.wind}</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>5-Day Forecast</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="grid grid-cols-5 gap-3">
-                            {weatherData.forecast?.map((day: any, index: number) => (
-                              <div key={index} className="text-center p-3 bg-gray-50 rounded-lg">
-                                {getWeatherIcon(day.icon || day.condition)}
-                                <p className="font-medium mt-2">{day.day}</p>
-                                <p className="text-sm text-gray-600">{day.high}</p>
-                                <p className="text-xs text-gray-500">{day.low}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center space-x-2">
-                            <Backpack className="w-5 h-5 text-orange-500" />
-                            <span>Packing Tips</span>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="space-y-2">
-                            {weatherData.packing_tips?.map((tip: string, index: number) => (
-                              <li key={index} className="flex items-start space-x-2">
-                                <span className="text-orange-500 mt-1">✓</span>
-                                <span className="text-sm">{tip}</span>
-                              </li>
-                            ))}
-                          </ul>
-                          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                            <p className="text-sm font-medium text-blue-900">{weatherData.best_time}</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* Distance Tab */}
-                <TabsContent value="distance" className="space-y-4 mt-0">
-                  <h3 className="text-xl font-semibold mb-4">Travel Distance & Routes</h3>
-                  
-                  {isLoadingDistance ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
-                      <p className="mt-2 text-gray-600">Calculating routes...</p>
-                    </div>
-                  ) : distanceInfo && (
-                    <div className="space-y-6">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Route Options</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            {distanceInfo.routes?.map((route: any, index: number) => (
-                              <div key={index} className="p-4 border rounded-lg">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center space-x-2">
-                                    {getTransportIcon(route.mode)}
-                                    <span className="font-semibold">{route.mode}</span>
-                                  </div>
-                                  <Badge variant="outline">{route.cost_estimate}</Badge>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                                  <div>Distance: {route.distance}</div>
-                                  <div>Duration: {route.duration}</div>
-                                </div>
-                                <p className="text-sm text-gray-600 mt-2">{route.route_description}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {distanceInfo.travel_tips && (
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>Travel Tips</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <ul className="space-y-2">
-                              {distanceInfo.travel_tips.map((tip: string, index: number) => (
-                                <li key={index} className="flex items-start space-x-2">
-                                  <span className="text-orange-500">💡</span>
-                                  <span className="text-sm">{tip}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* Budget Tab */}
-                <TabsContent value="budget" className="space-y-4 mt-0">
-                  <h3 className="text-xl font-semibold mb-4">Budget Calculator</h3>
+                <TabsContent value="places" className="mt-0">
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center space-x-2">
-                        <Calculator className="w-5 h-5 text-orange-500" />
-                        <span>Estimated Costs</span>
+                        <MapPin className="w-5 h-5 text-orange-500" />
+                        <span>Must Visit Places in {trip.destination}</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {mustVisitPlaces.map((place: string, index: number) => (
+                          <Card key={index} className="border-2 border-orange-100">
+                            <CardContent className="p-4">
+                              <div className="flex items-start space-x-3">
+                                <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold">
+                                  {index + 1}
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-lg">{place}</h4>
+                                  <p className="text-sm text-gray-600 mt-1">
+                                    Explore the beauty and culture of {place}
+                                  </p>
+                                  <div className="flex items-center space-x-2 mt-2">
+                                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                    <span className="text-sm text-gray-600">Must visit destination</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="cuisine" className="mt-0">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <Utensils className="w-5 h-5 text-orange-500" />
+                        <span>Famous Cuisine of {trip.destination}</span>
+                      </CardTitle>
+                      <p className="text-sm text-gray-600 mt-1">Don't miss these local delicacies!</p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {cuisineList.map((dish: string, index: number) => (
+                          <Card key={index} className="border-2 border-orange-100 hover:border-orange-300 transition-all">
+                            <CardContent className="p-4">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-lg flex items-center justify-center text-white text-xl">
+                                  🍽️
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-semibold">{dish}</h4>
+                                  <Badge variant="outline" className="mt-1">Traditional</Badge>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                      <div className="mt-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                        <h4 className="font-semibold text-orange-900 mb-2">🌟 Pro Tip</h4>
+                        <p className="text-sm text-orange-800">
+                          Try local street food for authentic flavors! Ask locals for their favorite spots.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="stays" className="mt-0">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <Hotel className="w-5 h-5 text-orange-500" />
+                        <span>Recommended Accommodations</span>
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                          <span>Accommodation (30-40%)</span>
-                          <span className="font-semibold">₹8,000 - ₹12,000</span>
-                        </div>
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                          <span>Food & Dining (20-25%)</span>
-                          <span className="font-semibold">₹5,000 - ₹7,500</span>
-                        </div>
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                          <span>Activities (25-30%)</span>
-                          <span className="font-semibold">₹6,000 - ₹9,000</span>
-                        </div>
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                          <span>Transport (15-20%)</span>
-                          <span className="font-semibold">₹4,000 - ₹6,000</span>
-                        </div>
-                        <div className="flex justify-between items-center p-4 bg-orange-50 rounded-lg border-2 border-orange-200">
-                          <span className="font-bold">Total per person</span>
-                          <span className="font-bold text-orange-600 text-xl">₹23,000 - ₹34,500</span>
+                        {['Budget Hotels', 'Mid-Range Hotels', 'Luxury Resorts', 'Homestays'].map((category, index) => (
+                          <Card key={index} className="border-2 border-gray-200">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h4 className="font-semibold text-lg">{category}</h4>
+                                  <p className="text-sm text-gray-600 mt-1">
+                                    {category === 'Budget Hotels' && '₹1,000 - ₹2,500 per night'}
+                                    {category === 'Mid-Range Hotels' && '₹2,500 - ₹5,000 per night'}
+                                    {category === 'Luxury Resorts' && '₹5,000+ per night'}
+                                    {category === 'Homestays' && '₹800 - ₹2,000 per night'}
+                                  </p>
+                                  <div className="flex items-center space-x-1 mt-2">
+                                    {[...Array(index + 2)].map((_, i) => (
+                                      <Star key={i} className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                    ))}
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => window.open(`https://www.booking.com/searchresults.html?ss=${trip.destination}`, '_blank')}
+                                >
+                                  <ExternalLink className="w-4 h-4 mr-1" />
+                                  Book Now
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="budget" className="mt-0">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <DollarSign className="w-5 h-5 text-orange-500" />
+                        <span>Estimated Budget Breakdown</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {[
+                          { category: 'Accommodation', amount: '₹8,000 - ₹15,000', percentage: 35 },
+                          { category: 'Food & Dining', amount: '₹5,000 - ₹10,000', percentage: 25 },
+                          { category: 'Transportation', amount: '₹6,000 - ₹12,000', percentage: 25 },
+                          { category: 'Activities & Sightseeing', amount: '₹3,000 - ₹6,000', percentage: 15 }
+                        ].map((item, index) => (
+                          <div key={index} className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">{item.category}</span>
+                              <span className="text-orange-600 font-semibold">{item.amount}</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-orange-500 h-2 rounded-full"
+                                style={{ width: `${item.percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-lg">Total Estimated Cost</span>
+                            <span className="font-bold text-2xl text-green-700">₹22,000 - ₹43,000</span>
+                          </div>
+                          <p className="text-sm text-gray-600 mt-2">
+                            For {trip.travelers} traveler{trip.travelers > 1 ? 's' : ''} • {trip.duration}
+                          </p>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                 </TabsContent>
 
-                {/* Reviews Tab */}
-                <TabsContent value="reviews" className="space-y-4 mt-0">
-                  <h3 className="text-xl font-semibold mb-4">Reviews & Experiences</h3>
-                  
+                <TabsContent value="distance" className="mt-0">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Share Your Experience</CardTitle>
+                      <CardTitle className="flex items-center space-x-2">
+                        <Map className="w-5 h-5 text-orange-500" />
+                        <span>Distance & Route Information</span>
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        <div>
-                          <label className="text-sm font-medium">Rating</label>
-                          <div className="flex space-x-1 mt-1">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={`w-6 h-6 cursor-pointer ${
-                                  star <= newReview.rating
-                                    ? 'fill-yellow-400 text-yellow-400'
-                                    : 'text-gray-300'
-                                }`}
-                                onClick={() => setNewReview({ ...newReview, rating: star })}
-                              />
-                            ))}
-                          </div>
+                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <h4 className="font-semibold text-blue-900 mb-2">From: {trip.from_location}</h4>
+                          <h4 className="font-semibold text-blue-900">To: {trip.destination}</h4>
                         </div>
-                        <div>
-                          <label className="text-sm font-medium">Title</label>
-                          <Input
-                            value={newReview.title}
-                            onChange={(e) => setNewReview({ ...newReview, title: e.target.value })}
-                            placeholder="Sum up your experience"
-                            className="mt-1"
-                          />
+
+                        {[
+                          { mode: 'By Flight', icon: '✈️', distance: '~500-1500 km', time: '1-3 hours', cost: '₹3,000 - ₹8,000' },
+                          { mode: 'By Train', icon: '🚂', distance: '~500-1500 km', time: '8-24 hours', cost: '₹500 - ₹2,500' },
+                          { mode: 'By Bus', icon: '🚌', distance: '~500-1500 km', time: '10-30 hours', cost: '₹800 - ₹2,000' },
+                          { mode: 'By Car', icon: '🚗', distance: '~500-1500 km', time: '10-25 hours', cost: '₹5,000 - ₹12,000' }
+                        ].map((route, index) => (
+                          <Card key={index} className="border-2 border-gray-200">
+                            <CardContent className="p-4">
+                              <div className="flex items-center space-x-4">
+                                <div className="text-4xl">{route.icon}</div>
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-lg">{route.mode}</h4>
+                                  <div className="grid grid-cols-3 gap-4 mt-2 text-sm">
+                                    <div>
+                                      <span className="text-gray-600">Distance:</span>
+                                      <p className="font-medium">{route.distance}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">Time:</span>
+                                      <p className="font-medium">{route.time}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">Cost:</span>
+                                      <p className="font-medium text-orange-600">{route.cost}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+
+                        <div className="mt-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                          <h4 className="font-semibold text-orange-900 mb-2">📍 Route Map</h4>
+                          <p className="text-sm text-orange-800 mb-3">
+                            View detailed route on Google Maps
+                          </p>
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => window.open(`https://www.google.com/maps/dir/${trip.from_location}/${trip.destination}`, '_blank')}
+                          >
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Open in Google Maps
+                          </Button>
                         </div>
-                        <div>
-                          <label className="text-sm font-medium">Review</label>
-                          <Textarea
-                            value={newReview.review_text}
-                            onChange={(e) => setNewReview({ ...newReview, review_text: e.target.value })}
-                            placeholder="Share your thoughts about this trip..."
-                            rows={4}
-                            className="mt-1"
-                          />
-                        </div>
-                        <Button
-                          onClick={submitReview}
-                          disabled={isSubmittingReview}
-                          className="w-full bg-orange-500 hover:bg-orange-600"
-                        >
-                          {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
-                        </Button>
                       </div>
                     </CardContent>
                   </Card>
-
-                  {reviews.length > 0 && (
-                    <div className="space-y-4">
-                      <h4 className="font-semibold">Previous Reviews</h4>
-                      {reviews.map((review, index) => (
-                        <Card key={index}>
-                          <CardContent className="pt-6">
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <h5 className="font-semibold">{review.title}</h5>
-                                <div className="flex space-x-1 mt-1">
-                                  {[1, 2, 3, 4, 5].map((star) => (
-                                    <Star
-                                      key={star}
-                                      className={`w-4 h-4 ${
-                                        star <= review.rating
-                                          ? 'fill-yellow-400 text-yellow-400'
-                                          : 'text-gray-300'
-                                      }`}
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                              <span className="text-xs text-gray-500">
-                                {new Date(review.created_at).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-600">{review.review_text}</p>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
                 </TabsContent>
               </div>
             </Tabs>

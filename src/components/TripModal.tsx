@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { X, MapPin, Calendar, Users, DollarSign, Plane, Train, Bus, Car, Sparkles, Loader2 } from 'lucide-react';
-import { invokeLLM } from '@/integrations/core';
+import { X, MapPin, Calendar, Users, Plane, Train, Bus, Car, Sparkles, Loader2 } from 'lucide-react';
+import { indiaPlacesData } from '@/lib/india-places-data';
 import { useToast } from '@/hooks/use-toast';
 
 interface TripModalProps {
@@ -51,78 +51,26 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
     }
   }, [selectedState]);
 
-  const loadFamousPlaces = async (state: string) => {
+  const loadFamousPlaces = (state: string) => {
     setIsLoadingPlaces(true);
     setFamousPlaces([]);
     setSelectedPlaces([]);
     
-    try {
-      const response = await invokeLLM({
-        prompt: `List 8-10 famous tourist places in ${state}, India. For each place provide: name, type (heritage/nature/adventure/spiritual/beach/hill station), description (1 sentence), best time to visit, and why it's famous.`,
-        add_context_from_internet: true,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            places: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  name: { type: "string" },
-                  type: { type: "string" },
-                  description: { type: "string" },
-                  best_time: { type: "string" },
-                  famous_for: { type: "string" }
-                }
-              }
-            }
-          }
-        }
-      });
+    setTimeout(() => {
+      const places = indiaPlacesData[state] || [
+        { name: `${state} City`, type: 'City', description: 'Main city', best_time: 'October to March', famous_for: 'Local attractions' },
+        { name: `${state} Heritage Site`, type: 'Heritage', description: 'Historical monument', best_time: 'October to March', famous_for: 'Cultural significance' },
+        { name: `${state} Nature Spot`, type: 'Nature', description: 'Natural beauty', best_time: 'Year round', famous_for: 'Scenic views' }
+      ];
       
-      setFamousPlaces(response.places || []);
+      setFamousPlaces(places);
+      setIsLoadingPlaces(false);
+      
       toast({
         title: "Places Loaded!",
-        description: `Found ${response.places?.length || 0} amazing places in ${state}`
+        description: `Found ${places.length} amazing places in ${state}`
       });
-    } catch (error) {
-      console.log('Could not load places online, using fallback:', error);
-      const fallbackPlaces = generateFallbackPlaces(state);
-      setFamousPlaces(fallbackPlaces);
-      toast({
-        title: "Places Loaded",
-        description: `Showing popular destinations in ${state}`,
-        variant: "default"
-      });
-    } finally {
-      setIsLoadingPlaces(false);
-    }
-  };
-
-  const generateFallbackPlaces = (state: string) => {
-    const placesMap: { [key: string]: any[] } = {
-      'Goa': [
-        { name: 'Baga Beach', type: 'Beach', description: 'Popular beach known for water sports and nightlife', best_time: 'November to February', famous_for: 'Water sports and beach parties' },
-        { name: 'Old Goa Churches', type: 'Heritage', description: 'UNESCO World Heritage Portuguese churches', best_time: 'October to March', famous_for: 'Colonial architecture' },
-        { name: 'Dudhsagar Falls', type: 'Nature', description: 'Majestic four-tiered waterfall', best_time: 'July to September', famous_for: 'Scenic beauty' }
-      ],
-      'Rajasthan': [
-        { name: 'Jaipur City Palace', type: 'Heritage', description: 'Royal palace with museums and courtyards', best_time: 'October to March', famous_for: 'Rajput architecture' },
-        { name: 'Jaisalmer Fort', type: 'Heritage', description: 'Living fort in the Thar Desert', best_time: 'November to February', famous_for: 'Golden sandstone architecture' },
-        { name: 'Udaipur Lake Palace', type: 'Heritage', description: 'Floating palace on Lake Pichola', best_time: 'September to March', famous_for: 'Romantic setting' }
-      ],
-      'Kerala': [
-        { name: 'Alleppey Backwaters', type: 'Nature', description: 'Network of lagoons and lakes', best_time: 'November to February', famous_for: 'Houseboat cruises' },
-        { name: 'Munnar Tea Gardens', type: 'Hill Station', description: 'Sprawling tea plantations in hills', best_time: 'September to May', famous_for: 'Tea estates and cool climate' },
-        { name: 'Kovalam Beach', type: 'Beach', description: 'Crescent-shaped beach with lighthouse', best_time: 'October to March', famous_for: 'Ayurvedic treatments' }
-      ]
-    };
-
-    return placesMap[state] || [
-      { name: `${state} Heritage Site`, type: 'Heritage', description: 'Famous historical monument', best_time: 'October to March', famous_for: 'Cultural significance' },
-      { name: `${state} Natural Wonder`, type: 'Nature', description: 'Beautiful natural landscape', best_time: 'Year round', famous_for: 'Scenic beauty' },
-      { name: `${state} Spiritual Center`, type: 'Spiritual', description: 'Important pilgrimage site', best_time: 'October to March', famous_for: 'Religious importance' }
-    ];
+    }, 500);
   };
 
   const togglePlace = (placeName: string) => {
@@ -153,7 +101,7 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
       custom_budget: customBudget ? parseInt(customBudget) : null,
       transport_mode: transportMode,
       additional_locations: selectedPlaces,
-      status: 'planning'
+      status: 'saved'
     };
 
     onTripCreated(tripData);
@@ -177,7 +125,6 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
 
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-4xl mx-auto space-y-6">
-              {/* Step 1: Select State */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
@@ -199,17 +146,17 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
                 </CardContent>
               </Card>
 
-              {/* Step 2: Select Famous Places */}
               {selectedState && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Step 2: Select Places to Visit</CardTitle>
+                    <CardTitle>Step 2: Select Places to Visit in {selectedState}</CardTitle>
+                    <p className="text-sm text-gray-600 mt-1">Choose multiple districts and famous destinations</p>
                   </CardHeader>
                   <CardContent>
                     {isLoadingPlaces ? (
                       <div className="text-center py-8">
                         <Loader2 className="w-8 h-8 animate-spin text-orange-500 mx-auto" />
-                        <p className="mt-2 text-gray-600">Loading famous places in {selectedState}...</p>
+                        <p className="mt-2 text-gray-600">Loading famous places...</p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -225,10 +172,15 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
-                                <h4 className="font-semibold">{place.name}</h4>
+                                <h4 className="font-semibold text-lg">{place.name}</h4>
                                 <Badge variant="outline" className="mt-1">{place.type}</Badge>
                                 <p className="text-sm text-gray-600 mt-2">{place.description}</p>
-                                <p className="text-xs text-gray-500 mt-1">Best time: {place.best_time}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  <span className="font-medium">Best time:</span> {place.best_time}
+                                </p>
+                                <p className="text-xs text-orange-600 mt-1">
+                                  <span className="font-medium">Famous for:</span> {place.famous_for}
+                                </p>
                               </div>
                               <Checkbox
                                 checked={selectedPlaces.includes(place.name)}
@@ -240,9 +192,9 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
                       </div>
                     )}
                     {selectedPlaces.length > 0 && (
-                      <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                      <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
                         <p className="text-sm font-medium text-green-900">
-                          {selectedPlaces.length} place{selectedPlaces.length > 1 ? 's' : ''} selected
+                          ✓ {selectedPlaces.length} place{selectedPlaces.length > 1 ? 's' : ''} selected: {selectedPlaces.join(', ')}
                         </p>
                       </div>
                     )}
@@ -250,7 +202,6 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
                 </Card>
               )}
 
-              {/* Step 3: Trip Details */}
               {selectedPlaces.length > 0 && (
                 <Card>
                   <CardHeader>
@@ -329,7 +280,6 @@ export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
             </div>
           </div>
 
-          {/* Footer */}
           <div className="border-t p-6 bg-gray-50">
             <div className="max-w-4xl mx-auto flex justify-between items-center">
               <Button variant="outline" onClick={onClose}>
