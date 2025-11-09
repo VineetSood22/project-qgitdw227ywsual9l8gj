@@ -1,439 +1,351 @@
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useToast } from '@/hooks/use-toast';
-import { Trip } from '@/entities';
+import { X, MapPin, Calendar, Users, DollarSign, Plane, Train, Bus, Car, Sparkles, Loader2 } from 'lucide-react';
 import { invokeLLM } from '@/integrations/core';
-import { MapPin, Calendar, Users, IndianRupee, Plane, Train, Car, Sparkles } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface TripModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onTripCreated: (trip: any) => void;
+  onTripCreated: (tripData: any) => void;
 }
 
-const indianCities = [
-  'Mumbai', 'Delhi', 'Bangalore', 'Kolkata', 'Chennai', 'Hyderabad', 'Pune', 'Ahmedabad',
-  'Jaipur', 'Lucknow', 'Chandigarh', 'Kochi', 'Goa', 'Shimla', 'Manali', 'Udaipur'
+const indianStates = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
+  'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
+  'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+  'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
 ];
 
-const popularDestinations = [
-  'Goa', 'Manali', 'Shimla', 'Jaipur', 'Udaipur', 'Kerala', 'Ladakh', 'Rishikesh',
-  'Varanasi', 'Darjeeling', 'Ooty', 'Andaman', 'Kashmir', 'Hampi', 'Agra'
-];
-
-const interests = [
-  'Adventure', 'Beach', 'Heritage', 'Spiritual', 'Wildlife', 'Hill Stations',
-  'Food & Culture', 'Photography', 'Trekking', 'Relaxation'
+const transportModes = [
+  { value: 'flight', label: 'Flight', icon: Plane },
+  { value: 'train', label: 'Train', icon: Train },
+  { value: 'bus', label: 'Bus', icon: Bus },
+  { value: 'car', label: 'Car/Road Trip', icon: Car }
 ];
 
 export function TripModal({ isOpen, onClose, onTripCreated }: TripModalProps) {
-  const [formData, setFormData] = useState({
-    destination: '',
-    fromLocation: '',
-    duration: '',
-    travelers: '2',
-    budget: 'medium',
-    customBudget: '',
-    transportMode: 'flight',
-    selectedInterests: [] as string[],
-    isRoadTrip: false
-  });
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedState, setSelectedState] = useState('');
+  const [famousPlaces, setFamousPlaces] = useState<any[]>([]);
+  const [selectedPlaces, setSelectedPlaces] = useState<string[]>([]);
+  const [fromLocation, setFromLocation] = useState('');
+  const [duration, setDuration] = useState('');
+  const [travelers, setTravelers] = useState('2');
+  const [budget, setBudget] = useState('medium');
+  const [customBudget, setCustomBudget] = useState('');
+  const [transportMode, setTransportMode] = useState('flight');
+  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
   const { toast } = useToast();
 
-  const handleInterestToggle = (interest: string) => {
-    setFormData(prev => ({
-      ...prev,
-      selectedInterests: prev.selectedInterests.includes(interest)
-        ? prev.selectedInterests.filter(i => i !== interest)
-        : [...prev.selectedInterests, interest]
-    }));
+  useEffect(() => {
+    if (selectedState) {
+      loadFamousPlaces(selectedState);
+    }
+  }, [selectedState]);
+
+  const loadFamousPlaces = async (state: string) => {
+    setIsLoadingPlaces(true);
+    setFamousPlaces([]);
+    setSelectedPlaces([]);
+    
+    try {
+      const response = await invokeLLM({
+        prompt: `List 8-10 famous tourist places in ${state}, India. For each place provide: name, type (heritage/nature/adventure/spiritual/beach/hill station), description (1 sentence), best time to visit, and why it's famous.`,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            places: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  type: { type: "string" },
+                  description: { type: "string" },
+                  best_time: { type: "string" },
+                  famous_for: { type: "string" }
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      setFamousPlaces(response.places || []);
+      toast({
+        title: "Places Loaded!",
+        description: `Found ${response.places?.length || 0} amazing places in ${state}`
+      });
+    } catch (error) {
+      console.log('Could not load places online, using fallback:', error);
+      const fallbackPlaces = generateFallbackPlaces(state);
+      setFamousPlaces(fallbackPlaces);
+      toast({
+        title: "Places Loaded",
+        description: `Showing popular destinations in ${state}`,
+        variant: "default"
+      });
+    } finally {
+      setIsLoadingPlaces(false);
+    }
   };
 
-  const generateOfflinePlan = (data: typeof formData) => {
-    const budgetRanges = {
-      budget: '₹10,000 - ₹20,000',
-      medium: '₹20,000 - ₹40,000',
-      luxury: '₹40,000+'
+  const generateFallbackPlaces = (state: string) => {
+    const placesMap: { [key: string]: any[] } = {
+      'Goa': [
+        { name: 'Baga Beach', type: 'Beach', description: 'Popular beach known for water sports and nightlife', best_time: 'November to February', famous_for: 'Water sports and beach parties' },
+        { name: 'Old Goa Churches', type: 'Heritage', description: 'UNESCO World Heritage Portuguese churches', best_time: 'October to March', famous_for: 'Colonial architecture' },
+        { name: 'Dudhsagar Falls', type: 'Nature', description: 'Majestic four-tiered waterfall', best_time: 'July to September', famous_for: 'Scenic beauty' }
+      ],
+      'Rajasthan': [
+        { name: 'Jaipur City Palace', type: 'Heritage', description: 'Royal palace with museums and courtyards', best_time: 'October to March', famous_for: 'Rajput architecture' },
+        { name: 'Jaisalmer Fort', type: 'Heritage', description: 'Living fort in the Thar Desert', best_time: 'November to February', famous_for: 'Golden sandstone architecture' },
+        { name: 'Udaipur Lake Palace', type: 'Heritage', description: 'Floating palace on Lake Pichola', best_time: 'September to March', famous_for: 'Romantic setting' }
+      ],
+      'Kerala': [
+        { name: 'Alleppey Backwaters', type: 'Nature', description: 'Network of lagoons and lakes', best_time: 'November to February', famous_for: 'Houseboat cruises' },
+        { name: 'Munnar Tea Gardens', type: 'Hill Station', description: 'Sprawling tea plantations in hills', best_time: 'September to May', famous_for: 'Tea estates and cool climate' },
+        { name: 'Kovalam Beach', type: 'Beach', description: 'Crescent-shaped beach with lighthouse', best_time: 'October to March', famous_for: 'Ayurvedic treatments' }
+      ]
     };
 
-    const transportInfo = {
-      flight: 'Round-trip flights included',
-      train: 'Train tickets in AC class',
-      bus: 'Comfortable bus travel',
-      rental: 'Self-drive car rental'
-    };
-
-    return {
-      name: `${data.destination} Adventure`,
-      destination: data.destination,
-      from_location: data.fromLocation,
-      duration: data.duration,
-      travelers: parseInt(data.travelers),
-      budget: data.budget,
-      custom_budget: data.customBudget ? parseInt(data.customBudget) : null,
-      transport_mode: data.transportMode,
-      interests: data.selectedInterests,
-      is_road_trip: data.isRoadTrip,
-      status: 'planning',
-      ai_suggestions: `
-🎯 **Your ${data.destination} Trip Plan**
-
-📅 **Duration:** ${data.duration}
-👥 **Travelers:** ${data.travelers} people
-💰 **Budget:** ${budgetRanges[data.budget as keyof typeof budgetRanges]} per person
-🚗 **Transport:** ${transportInfo[data.transportMode as keyof typeof transportInfo]}
-
-**Day-by-Day Itinerary:**
-
-**Day 1: Arrival & Local Exploration**
-- Arrive in ${data.destination}
-- Check into hotel
-- Evening local market visit
-- Welcome dinner at local restaurant
-
-**Day 2: Main Attractions**
-- Visit top landmarks
-- Cultural experiences
-- Local cuisine tasting
-- Sunset viewpoint
-
-**Day 3: Adventure & Activities**
-${data.selectedInterests.length > 0 ? `- ${data.selectedInterests.join(' activities\n- ')} activities` : '- Guided tours\n- Local experiences'}
-- Free time for shopping
-
-**Day 4: Departure**
-- Morning leisure
-- Last-minute shopping
-- Departure
-
-**Recommended Hotels:**
-- Budget: Local guesthouses (₹1,500-2,500/night)
-- Mid-range: 3-star hotels (₹3,000-5,000/night)
-- Luxury: 5-star resorts (₹8,000+/night)
-
-**Must-Try Food:**
-- Local specialties
-- Street food tours
-- Traditional restaurants
-
-**Travel Tips:**
-- Best time to visit: Check seasonal weather
-- Pack according to activities
-- Book accommodations in advance
-- Keep emergency contacts handy
-
-**Estimated Costs:**
-- Accommodation: 30-40% of budget
-- Food: 20-25% of budget
-- Activities: 25-30% of budget
-- Transport: 15-20% of budget
-
-*This is a sample itinerary. Customize based on your preferences!*
-      `.trim()
-    };
+    return placesMap[state] || [
+      { name: `${state} Heritage Site`, type: 'Heritage', description: 'Famous historical monument', best_time: 'October to March', famous_for: 'Cultural significance' },
+      { name: `${state} Natural Wonder`, type: 'Nature', description: 'Beautiful natural landscape', best_time: 'Year round', famous_for: 'Scenic beauty' },
+      { name: `${state} Spiritual Center`, type: 'Spiritual', description: 'Important pilgrimage site', best_time: 'October to March', famous_for: 'Religious importance' }
+    ];
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const togglePlace = (placeName: string) => {
+    setSelectedPlaces(prev => 
+      prev.includes(placeName) 
+        ? prev.filter(p => p !== placeName)
+        : [...prev, placeName]
+    );
+  };
 
-    if (!formData.destination || !formData.fromLocation || !formData.duration) {
+  const handleCreateTrip = () => {
+    if (!selectedState || selectedPlaces.length === 0 || !fromLocation || !duration) {
       toast({
         title: "Missing Information",
-        description: "Please fill in destination, starting location, and duration",
+        description: "Please select state, places, departure city, and duration",
         variant: "destructive"
       });
       return;
     }
 
-    setIsGenerating(true);
+    const tripData = {
+      name: `${selectedState} Adventure`,
+      destination: selectedState,
+      from_location: fromLocation,
+      duration,
+      travelers: parseInt(travelers),
+      budget,
+      custom_budget: customBudget ? parseInt(customBudget) : null,
+      transport_mode: transportMode,
+      additional_locations: selectedPlaces,
+      status: 'planning'
+    };
 
-    try {
-      // Try AI generation first
-      let aiSuggestions = '';
-      try {
-        const prompt = `Create a detailed ${formData.duration} trip itinerary for ${formData.travelers} travelers going to ${formData.destination} from ${formData.fromLocation}. 
-        Budget: ${formData.budget}${formData.customBudget ? ` (₹${formData.customBudget})` : ''}
-        Transport: ${formData.transportMode}
-        Interests: ${formData.selectedInterests.join(', ') || 'General sightseeing'}
-        
-        Include:
-        - Day-by-day itinerary
-        - Accommodation suggestions
-        - Food recommendations
-        - Activities based on interests
-        - Budget breakdown
-        - Travel tips
-        
-        Format with clear headings and bullet points.`;
-
-        const response = await invokeLLM({
-          prompt,
-          add_context_from_internet: true
-        });
-
-        aiSuggestions = typeof response === 'string' ? response : JSON.stringify(response);
-      } catch (aiError) {
-        console.log('AI generation unavailable, using smart template:', aiError);
-        const offlinePlan = generateOfflinePlan(formData);
-        aiSuggestions = offlinePlan.ai_suggestions;
-      }
-
-      // Create trip record
-      const tripData = {
-        name: `${formData.destination} Trip`,
-        destination: formData.destination,
-        from_location: formData.fromLocation,
-        duration: formData.duration,
-        travelers: parseInt(formData.travelers),
-        budget: formData.budget,
-        custom_budget: formData.customBudget ? parseInt(formData.customBudget) : null,
-        transport_mode: formData.transportMode,
-        interests: formData.selectedInterests,
-        is_road_trip: formData.isRoadTrip,
-        ai_suggestions: aiSuggestions,
-        status: 'planning'
-      };
-
-      try {
-        const savedTrip = await Trip.create(tripData);
-        console.log('Trip saved to database:', savedTrip);
-        onTripCreated(savedTrip);
-      } catch (dbError) {
-        console.log('Database unavailable, using local trip:', dbError);
-        // Create a local trip object with a temporary ID
-        const localTrip = {
-          ...tripData,
-          id: `local-${Date.now()}`,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        onTripCreated(localTrip);
-      }
-
-      toast({
-        title: "Trip Created! ✈️",
-        description: `Your ${formData.destination} adventure is ready to explore!`
-      });
-
-      onClose();
-    } catch (error) {
-      console.error('Trip creation error:', error);
-      toast({
-        title: "Trip Created Locally",
-        description: "Your trip plan is ready! (Saved locally)",
-        variant: "default"
-      });
-
-      // Still create the trip locally
-      const localTrip = generateOfflinePlan(formData);
-      onTripCreated({
-        ...localTrip,
-        id: `local-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-      onClose();
-    } finally {
-      setIsGenerating(false);
-    }
+    onTripCreated(tripData);
   };
 
+  if (!isOpen) return null;
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-2xl">
-            <Sparkles className="w-6 h-6 text-orange-500" />
-            Plan Your Dream Trip
-          </DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Destination */}
-          <div className="space-y-2">
-            <Label htmlFor="destination" className="flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              Where do you want to go?
-            </Label>
-            <Select value={formData.destination} onValueChange={(value) => setFormData(prev => ({ ...prev, destination: value }))}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select destination" />
-              </SelectTrigger>
-              <SelectContent>
-                {popularDestinations.map(dest => (
-                  <SelectItem key={dest} value={dest}>{dest}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* From Location */}
-          <div className="space-y-2">
-            <Label htmlFor="fromLocation">Starting from</Label>
-            <Select value={formData.fromLocation} onValueChange={(value) => setFormData(prev => ({ ...prev, fromLocation: value }))}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select your city" />
-              </SelectTrigger>
-              <SelectContent>
-                {indianCities.map(city => (
-                  <SelectItem key={city} value={city}>{city}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Duration & Travelers */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="duration" className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Duration
-              </Label>
-              <Select value={formData.duration} onValueChange={(value) => setFormData(prev => ({ ...prev, duration: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select duration" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2-3 days">2-3 days</SelectItem>
-                  <SelectItem value="4-5 days">4-5 days</SelectItem>
-                  <SelectItem value="6-7 days">6-7 days</SelectItem>
-                  <SelectItem value="1 week">1 week</SelectItem>
-                  <SelectItem value="10 days">10 days</SelectItem>
-                  <SelectItem value="2 weeks">2 weeks</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="travelers" className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Travelers
-              </Label>
-              <Input
-                id="travelers"
-                type="number"
-                min="1"
-                max="20"
-                value={formData.travelers}
-                onChange={(e) => setFormData(prev => ({ ...prev, travelers: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          {/* Budget */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <IndianRupee className="w-4 h-4" />
-              Budget per person
-            </Label>
-            <Select value={formData.budget} onValueChange={(value) => setFormData(prev => ({ ...prev, budget: value }))}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="budget">Budget (₹10,000 - ₹20,000)</SelectItem>
-                <SelectItem value="medium">Medium (₹20,000 - ₹40,000)</SelectItem>
-                <SelectItem value="luxury">Luxury (₹40,000+)</SelectItem>
-                <SelectItem value="custom">Custom Amount</SelectItem>
-              </SelectContent>
-            </Select>
-            {formData.budget === 'custom' && (
-              <Input
-                type="number"
-                placeholder="Enter your budget in ₹"
-                value={formData.customBudget}
-                onChange={(e) => setFormData(prev => ({ ...prev, customBudget: e.target.value }))}
-                className="mt-2"
-              />
-            )}
-          </div>
-
-          {/* Transport Mode */}
-          <div className="space-y-2">
-            <Label>Preferred Transport</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { value: 'flight', label: 'Flight', icon: Plane },
-                { value: 'train', label: 'Train', icon: Train },
-                { value: 'bus', label: 'Bus', icon: Car },
-                { value: 'rental', label: 'Rental Car', icon: Car }
-              ].map(({ value, label, icon: Icon }) => (
-                <Button
-                  key={value}
-                  type="button"
-                  variant={formData.transportMode === value ? 'default' : 'outline'}
-                  className="justify-start"
-                  onClick={() => setFormData(prev => ({ ...prev, transportMode: value }))}
-                >
-                  <Icon className="w-4 h-4 mr-2" />
-                  {label}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Interests */}
-          <div className="space-y-2">
-            <Label>Your Interests (select all that apply)</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {interests.map(interest => (
-                <div key={interest} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={interest}
-                    checked={formData.selectedInterests.includes(interest)}
-                    onCheckedChange={() => handleInterestToggle(interest)}
-                  />
-                  <label htmlFor={interest} className="text-sm cursor-pointer">
-                    {interest}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Road Trip Option */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="roadTrip"
-              checked={formData.isRoadTrip}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isRoadTrip: checked as boolean }))}
-            />
-            <label htmlFor="roadTrip" className="text-sm cursor-pointer">
-              This is a road trip (explore multiple locations)
-            </label>
-          </div>
-
-          {/* Submit Button */}
-          <div className="flex gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
-              Cancel
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-4 bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="flex flex-col h-full">
+          <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-orange-500 to-orange-600">
+            <h2 className="text-2xl font-bold text-white flex items-center space-x-2">
+              <Sparkles className="w-6 h-6" />
+              <span>Dream Your Trip</span>
+            </h2>
+            <Button variant="ghost" size="sm" onClick={onClose} className="text-white hover:bg-white/20">
+              <X className="w-5 h-5" />
             </Button>
-            <Button 
-              type="submit" 
-              className="flex-1 bg-orange-500 hover:bg-orange-600"
-              disabled={isGenerating}
-            >
-              {isGenerating ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                  Creating Your Trip...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Generate Trip Plan
-                </>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-4xl mx-auto space-y-6">
+              {/* Step 1: Select State */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <MapPin className="w-5 h-5 text-orange-500" />
+                    <span>Step 1: Choose Your Destination State</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Select value={selectedState} onValueChange={setSelectedState}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {indianStates.map(state => (
+                        <SelectItem key={state} value={state}>{state}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+
+              {/* Step 2: Select Famous Places */}
+              {selectedState && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Step 2: Select Places to Visit</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingPlaces ? (
+                      <div className="text-center py-8">
+                        <Loader2 className="w-8 h-8 animate-spin text-orange-500 mx-auto" />
+                        <p className="mt-2 text-gray-600">Loading famous places in {selectedState}...</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {famousPlaces.map((place, index) => (
+                          <div
+                            key={index}
+                            onClick={() => togglePlace(place.name)}
+                            className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                              selectedPlaces.includes(place.name)
+                                ? 'border-orange-500 bg-orange-50'
+                                : 'border-gray-200 hover:border-orange-300'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <h4 className="font-semibold">{place.name}</h4>
+                                <Badge variant="outline" className="mt-1">{place.type}</Badge>
+                                <p className="text-sm text-gray-600 mt-2">{place.description}</p>
+                                <p className="text-xs text-gray-500 mt-1">Best time: {place.best_time}</p>
+                              </div>
+                              <Checkbox
+                                checked={selectedPlaces.includes(place.name)}
+                                className="ml-2"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {selectedPlaces.length > 0 && (
+                      <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                        <p className="text-sm font-medium text-green-900">
+                          {selectedPlaces.length} place{selectedPlaces.length > 1 ? 's' : ''} selected
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               )}
-            </Button>
+
+              {/* Step 3: Trip Details */}
+              {selectedPlaces.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Step 3: Trip Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Departing From</Label>
+                        <Input
+                          value={fromLocation}
+                          onChange={(e) => setFromLocation(e.target.value)}
+                          placeholder="e.g., Mumbai, Delhi"
+                        />
+                      </div>
+                      <div>
+                        <Label>Duration</Label>
+                        <Input
+                          value={duration}
+                          onChange={(e) => setDuration(e.target.value)}
+                          placeholder="e.g., 5 days, 1 week"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Number of Travelers</Label>
+                        <Input
+                          type="number"
+                          value={travelers}
+                          onChange={(e) => setTravelers(e.target.value)}
+                          min="1"
+                        />
+                      </div>
+                      <div>
+                        <Label>Budget Range</Label>
+                        <Select value={budget} onValueChange={setBudget}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="budget">Budget (₹10k-25k)</SelectItem>
+                            <SelectItem value="medium">Medium (₹25k-50k)</SelectItem>
+                            <SelectItem value="luxury">Luxury (₹50k+)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Preferred Transport Mode</Label>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+                        {transportModes.map(mode => {
+                          const Icon = mode.icon;
+                          return (
+                            <div
+                              key={mode.value}
+                              onClick={() => setTransportMode(mode.value)}
+                              className={`p-3 border-2 rounded-lg cursor-pointer text-center transition-all ${
+                                transportMode === mode.value
+                                  ? 'border-orange-500 bg-orange-50'
+                                  : 'border-gray-200 hover:border-orange-300'
+                              }`}
+                            >
+                              <Icon className="w-6 h-6 mx-auto mb-1" />
+                              <p className="text-sm font-medium">{mode.label}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+
+          {/* Footer */}
+          <div className="border-t p-6 bg-gray-50">
+            <div className="max-w-4xl mx-auto flex justify-between items-center">
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateTrip}
+                disabled={!selectedState || selectedPlaces.length === 0 || !fromLocation || !duration}
+                className="bg-orange-500 hover:bg-orange-600"
+              >
+                Generate Trip Plan
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
